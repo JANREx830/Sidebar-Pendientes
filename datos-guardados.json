@@ -1,0 +1,28 @@
+{
+  "tasks": [
+    {
+      "id": "t-1792713057621",
+      "createdAt": 1792713057621,
+      "sender": "Sin especificar",
+      "text": "DIFER TRADE - CITA DE DIAGNOSTICO\r\nMartes, 27 de octubre · 9:00 – 10:30am\r\nZona horaria: America/Mexico_City\r\nInformación para unirse con Google Meet\r\nEnlace de la videollamada: https://meet.google.com/icz-mnzf-vbu\r\nO marca el: ‪(MX) +52 55 8421 0898‬ PIN: ‪570 698 614 5785‬#\r\nMás números de teléfono: https://tel.meet/icz-mnzf-vbu?pin=5706986145785",
+      "notes": "",
+      "area": "Refacciones",
+      "urgency": "Media",
+      "status": "pendiente",
+      "dateTimeFormatted": "[5:50 p.m., 22/10/2026]",
+      "timestamp": "5:50 p.m.",
+      "date": "22/10/2026"
+    }
+  ],
+  "settings": {
+    "accentColor": "#f43f5e",
+    "opacity": 98,
+    "blur": 31,
+    "alwaysOnTop": true,
+    "geminiApiKey": "",
+    "autoCollapseOnLeave": true,
+    "areas": [
+      "Refacciones"
+    ]
+  }
+}

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SideTask Pro</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body class="text-slate-100 antialiased select-none w-screen h-screen m-0 p-0 overflow-hidden bg-transparent flex justify-end">
+
+  <!-- ========================================================================= -->
+  <!-- CÁPSULA FLOTANTE: 68px EN MODO BARRA DELGADA / 410px EN MODO COMPLETO    -->
+  <!-- ========================================================================= -->
+  <div id="sidebarShell" class="sidebar-shell expanded">
+
+    <!-- TIRADOR DE ARRASTRE EN EL BORDE IZQUIERDO -->
+    <div id="dragHandle" class="drag-handle no-drag" title="Arrastra el borde para abrir o cerrar"></div>
+
+    <!-- ======================================================================= -->
+    <!-- MODO 1: BARRA DELGADA DE 68px (SOLO ICONOS CON EL COLOR DEL USUARIO)    -->
+    <!-- ======================================================================= -->
+    <nav id="collapsedRail" class="rail-column no-drag">
+      <div class="flex flex-col items-center gap-2 w-full">
+        <!-- Agarradera para mover la barra cuando está encogida -->
+        <div id="railMoveHandle"
+             class="w-11 h-8 rounded-xl btn-accent-soft flex items-center justify-center cursor-move"
+             title="Mantén presionado aquí y arrastra para mover la barra a cualquier lugar">
+          <i class="fa-solid fa-up-down-left-right text-xs"></i>
+        </div>
+
+        <!-- Botón principal para expandir -->
+        <button type="button" onclick="window.AppSettingsUI.setExpanded(true)"
+                class="rail-btn" title="Abrir barra completa">
+          <i class="fa-solid fa-angles-left text-sm"></i>
+        </button>
+
+        <div class="w-7 h-[1px] bg-white/10 my-0.5"></div>
+
+        <!-- Pegar directo con 1 clic desde modo delgado -->
+        <button type="button" onclick="captureClipboardManual()"
+                class="rail-btn" title="Pegar portapapeles y guardar en automático">
+          <i class="fa-solid fa-paste"></i>
+        </button>
+
+        <!-- Todos los pendientes -->
+        <button type="button" onclick="window.AppTaskManager.filterFromRail('all')"
+                class="rail-btn" title="Todos los pendientes">
+          <i class="fa-solid fa-clipboard-list"></i>
+          <span id="railBadgeAll" class="rail-badge hidden">0</span>
+        </button>
+
+        <!-- Áreas / Opciones dinámicas -->
+        <div id="railDynamicAreas" class="flex flex-col items-center gap-2.5 w-full"></div>
+
+        <!-- Urgentes -->
+        <button type="button" onclick="window.AppTaskManager.filterFromRail('urgente')"
+                class="rail-btn" title="Urgentes / Alta prioridad">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span id="railBadgeUrgentes" class="rail-badge urgent hidden">0</span>
+        </button>
+
+        <!-- Nuevo manual (+) -->
+        <button type="button" onclick="toggleManualForm()"
+                class="rail-btn" title="Nuevo pendiente manual (+)">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+      </div>
+
+      <!-- Ajustes abajo -->
+      <div class="flex flex-col items-center gap-2 w-full pt-2 border-t border-white/10">
+        <button type="button" onclick="window.AppSettingsUI.toggleSettingsDrawer()"
+                class="rail-btn" title="Personalizar colores y opciones">
+          <i class="fa-solid fa-palette"></i>
+        </button>
+      </div>
+    </nav>
+
+
+    <!-- ======================================================================= -->
+    <!-- MODO 2: SIDEBAR COMPLETO DE 410px (INTERFAZ LIMPIA DE 1 SOLA COLUMNA)  -->
+    <!-- ======================================================================= -->
+    <section class="expanded-content-pane">
+
+      <!-- 1. ENCABEZADO SUPERIOR -->
+      <header class="drag-region px-3.5 py-2.5 border-b border-white/10 flex items-center justify-between bg-slate-950/50">
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full accent-bg animate-pulse"></div>
+          <div>
+            <h1 class="font-bold text-xs tracking-wide text-white flex items-center gap-1.5">
+              SideTask <span class="accent-text font-black text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10">PRO</span>
+            </h1>
+          </div>
+        </div>
+
+        <div class="no-drag flex items-center gap-1">
+          <!-- Hacer chica la barra (Colapsar a 68px) -->
+          <button type="button" onclick="window.AppSettingsUI.setExpanded(false)"
+                  class="w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px]"
+                  title="Hacer barra delgada (Colapsar)">
+            <i class="fa-solid fa-angles-right"></i>
+          </button>
+
+          <!-- Nuevo Pendiente Manual (+) -->
+          <button type="button" onclick="toggleManualForm()"
+                  class="w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px]"
+                  title="Escribir pendiente manual (+)">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+
+          <!-- Agregar / Eliminar Opciones -->
+          <button type="button" onclick="window.AppSettingsUI.toggleQuickAreasPanel()"
+                  class="w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px]"
+                  title="Agregar o eliminar opciones del selector">
+            <i class="fa-solid fa-tags"></i>
+          </button>
+
+          <!-- Personalizar Colores y Ajustes -->
+          <button type="button" onclick="window.AppSettingsUI.toggleSettingsDrawer()"
+                  class="w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px]"
+                  title="Cambiar color de botones, opacidad y blur">
+            <i class="fa-solid fa-palette"></i>
+          </button>
+
+          <!-- Candado Auto-colapsar -->
+          <button type="button" id="btnAutoCollapseLock" onclick="window.AppSettingsUI.toggleAutoCollapseLock()"
+                  class="w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px]"
+                  title="Fijar o auto-colapsar al sacar el mouse">
+            <i class="fa-solid fa-lock text-[10px]"></i>
+          </button>
+
+          <!-- Ocultar a bandeja -->
+          <button type="button" onclick="window.AppSettingsUI.closeWindow()"
+                  class="w-7 h-7 rounded-lg bg-white/5 hover:bg-rose-500/30 text-slate-300 hover:text-rose-200 flex items-center justify-center text-[11px] transition"
+                  title="Ocultar a la bandeja del sistema">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- 2. ZONA PRINCIPAL DE PEGADO RÁPIDO (CTRL+V O ARRASTRAR CON MOUSE) -->
+      <div class="no-drag px-3 pt-2.5 pb-2 bg-slate-950/30 border-b border-white/10 space-y-2">
+
+        <!-- Caja de Pegado Automático (Ctrl+V o Drag & Drop) -->
+        <div id="pasteDropZone" class="paste-zone rounded-xl p-2 flex items-center gap-2">
+          <i class="fa-solid fa-paste accent-text text-sm ml-1.5"></i>
+          <input id="quickPasteInput" type="text"
+                 placeholder="Haz clic aquí y presiona Ctrl+V (o arrastra texto)..."
+                 class="flex-1 bg-transparent border-0 text-xs text-white placeholder-slate-400 focus:outline-none">
+          <button type="button" id="btnCaptureNow"
+                  class="px-2.5 py-1.5 rounded-lg btn-accent text-[11px] flex items-center gap-1 shrink-0"
+                  title="Pegar del portapapeles y guardar en automático">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Pegar</span>
+          </button>
+        </div>
+
+        <!-- FORMULARIO MANUAL DESPLEGABLE (+) -->
+        <div id="manualFormPanel" class="hidden p-3 rounded-xl bg-slate-950/95 border border-white/15 space-y-2.5 animate-card">
+          <div class="flex items-center justify-between text-[11px] font-semibold text-slate-200">
+            <span><i class="fa-solid fa-pen-to-square accent-text mr-1"></i>Nuevo Pendiente Manual</span>
+            <button type="button" onclick="toggleManualForm()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-1.5">
+            <input id="manualSender" type="text" placeholder="Autor (ej. Giovanni Saucedo)"
+                   class="bg-slate-900/90 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 accent-ring">
+            <div class="flex gap-1">
+              <select id="manualArea" class="flex-1 bg-slate-900/90 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white accent-ring">
+                <!-- Dinámico -->
+              </select>
+              <button type="button" onclick="window.AppSettingsUI.toggleQuickAreasPanel()"
+                      class="px-2 rounded-lg btn-accent-soft text-xs"
+                      title="Agregar o eliminar opciones">
+                <i class="fa-solid fa-tags text-[10px]"></i>
+              </button>
+            </div>
+          </div>
+
+          <textarea id="manualText" rows="2" placeholder="Mensaje o requerimiento (ej. cotizame una maquina)..."
+                    class="w-full bg-slate-900/90 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 accent-ring"></textarea>
+
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1 text-[11px]">
+              <span class="text-slate-400 mr-1 text-[10px]">Urgencia:</span>
+              <button type="button" onclick="setFormUrgency('Alta')" id="uBtn-Alta" class="px-2 py-0.5 rounded btn-accent text-[10px]">Alta</button>
+              <button type="button" onclick="setFormUrgency('Media')" id="uBtn-Media" class="px-2 py-0.5 rounded bg-slate-800 border border-white/10 text-slate-400 text-[10px]">Media</button>
+              <button type="button" onclick="setFormUrgency('Baja')" id="uBtn-Baja" class="px-2 py-0.5 rounded bg-slate-800 border border-white/10 text-slate-400 text-[10px]">Baja</button>
+            </div>
+            <button type="button" onclick="submitManualTask()" class="px-3 py-1 rounded-lg btn-accent text-xs">
+              Guardar
+            </button>
+          </div>
+        </div>
+
+        <!-- PANEL RÁPIDO PARA AGREGAR Y ELIMINAR OPCIONES -->
+        <div id="quickAreasPanel" class="hidden p-2.5 rounded-xl bg-slate-950/95 border border-white/15 space-y-2 animate-card">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="font-semibold accent-text flex items-center gap-1.5">
+              <i class="fa-solid fa-tags"></i> Agregar o Eliminar Opción
+            </span>
+            <button type="button" onclick="window.AppSettingsUI.toggleQuickAreasPanel()" class="text-slate-400 hover:text-white">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="flex gap-1.5">
+            <input id="quickNewAreaInput" type="text"
+                   placeholder="Escribe opción (ej. Cliente, Ventas)..."
+                   onkeydown="if(event.key==='Enter'){event.preventDefault(); handleQuickAddAreaSubmit();}"
+                   class="flex-1 bg-slate-900 border border-white/15 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 accent-ring">
+            <button type="button" id="btnSaveAreaQuick" onclick="handleQuickAddAreaSubmit()"
+                    class="px-2.5 py-1 rounded-lg btn-accent text-xs flex items-center gap-1">
+              <i class="fa-solid fa-plus"></i> Añadir
+            </button>
+          </div>
+          <div id="quickAreasList" class="flex flex-wrap gap-1.5 pt-0.5"></div>
+        </div>
+
+        <!-- Buscador + Selector de Opción + Botón Opciones -->
+        <div class="flex gap-1.5">
+          <div class="relative flex-1">
+            <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px]"></i>
+            <input id="searchInput" type="text"
+                   placeholder="Buscar mensaje o autor..."
+                   class="w-full bg-black/25 border border-white/10 rounded-lg pl-7 pr-6 py-1.5 text-xs text-white placeholder-slate-400 accent-ring">
+            <button type="button" id="btnClearSearch" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-[11px]">
+              <i class="fa-solid fa-circle-xmark"></i>
+            </button>
+          </div>
+
+          <select id="areaFilterSelect"
+                  class="bg-black/35 border border-white/15 rounded-lg px-2 py-1.5 text-[11px] text-slate-100 font-medium accent-ring max-w-[135px]">
+            <!-- Dinámico -->
+          </select>
+
+          <button type="button" onclick="window.AppSettingsUI.toggleQuickAreasPanel()"
+                  class="px-2.5 py-1.5 rounded-lg btn-accent-soft text-[11px] font-semibold flex items-center justify-center"
+                  title="Agregar o eliminar opción">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+
+        <!-- Pestañas de Estado (actualizadas con el color del usuario) -->
+        <div class="grid grid-cols-4 gap-1 pt-0.5 text-[11px]">
+          <button type="button" onclick="setStatusFilter('all')" id="tab-all" class="status-tab status-tab-active py-1 rounded-lg transition">
+            Todos (<span id="cnt-all">0</span>)
+          </button>
+          <button type="button" onclick="setStatusFilter('pendiente')" id="tab-pendiente" class="status-tab status-tab-inactive py-1 rounded-lg transition">
+            Pend. (<span id="cnt-pendiente">0</span>)
+          </button>
+          <button type="button" onclick="setStatusFilter('proceso')" id="tab-proceso" class="status-tab status-tab-inactive py-1 rounded-lg transition">
+            Proc. (<span id="cnt-proceso">0</span>)
+          </button>
+          <button type="button" onclick="setStatusFilter('resuelto')" id="tab-resuelto" class="status-tab status-tab-inactive py-1 rounded-lg transition">
+            Listo (<span id="cnt-resuelto">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. PANEL DE PERSONALIZACIÓN DE COLORES Y OPCIONES -->
+      <div id="settingsDrawer" class="no-drag hidden bg-slate-950/95 border-b border-white/15 p-3.5 space-y-3.5 text-xs animate-card z-20 overflow-y-auto max-h-[75vh]">
+        <div class="flex items-center justify-between border-b border-white/10 pb-2">
+          <span class="font-bold text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-palette accent-text"></i> Personalizar Color y Opciones
+          </span>
+          <button type="button" onclick="window.AppSettingsUI.toggleSettingsDrawer()" class="text-slate-400 hover:text-white">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- Presets de Color (Cambia todos los botones) -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] text-slate-200 font-semibold">Color de botones y barra:</span>
+            <label class="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+              <span>Elegir cualquier color:</span>
+              <input type="color" id="customColorPicker" value="#06b6d4" oninput="window.AppSettingsUI.setAccentColor(this.value)"
+                     class="w-6 h-6 rounded cursor-pointer bg-transparent border-0 p-0">
+            </label>
+          </div>
+          <div class="grid grid-cols-6 gap-1.5">
+            <button type="button" onclick="window.AppSettingsUI.setAccentColor('#06b6d4')" class="h-6 rounded-md bg-cyan-500 hover:scale-105 transition border border-white/30" title="Cyan"></button>
+            <button type="button" onclick="window.AppSettingsUI.setAccentColor('#10b981')" class="h-6 rounded-md bg-emerald-500 hover:scale-105 transition border border-white/20" title="Esmeralda"></button>
+            <button type="button" onclick="window.AppSettingsUI.setAccentColor('#f59e0b')" class="h-6 rounded-md bg-amber-500 hover:scale-105 transition border border-white/20" title="Ámbar"></button>
+            <button type="button" onclick="window.AppSettingsUI.setAccentColor('#f43f5e')" class="h-6 rounded-md bg-rose-500 hover:scale-105 transition border border-white/20" title="Rosa / Rojo"></button>
+            <button type="button" onclick="window.AppSettingsUI.setAccentColor('#a855f7')" class="h-6 rounded-md bg-purple-500 hover:scale-105 transition border border-white/20" title="Púrpura"></button>
+            <button type="button" onclick="window.AppSettingsUI.setAccentColor('#3b82f6')" class="h-6 rounded-md bg-blue-500 hover:scale-105 transition border border-white/20" title="Azul"></button>
+          </div>
+        </div>
+
+        <!-- Gestor de Opciones -->
+        <div class="p-3 rounded-xl bg-slate-900 border border-white/10 space-y-2">
+          <span class="text-[11px] font-semibold accent-text flex items-center gap-1.5">
+            <i class="fa-solid fa-tags"></i> Opciones del Selector
+          </span>
+          <div class="flex gap-1.5">
+            <input id="newAreaInput" type="text"
+                   placeholder="Escribe: Cliente, Ventas, Almacén..."
+                   onkeydown="if(event.key==='Enter'){event.preventDefault(); handleAddAreaSubmit();}"
+                   class="flex-1 bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 accent-ring">
+            <button type="button" id="btnSaveAreaSettings" onclick="handleAddAreaSubmit()"
+                    class="px-3 py-1.5 rounded-lg btn-accent text-xs flex items-center gap-1">
+              <i class="fa-solid fa-plus"></i> Añadir
+            </button>
+          </div>
+          <div id="settingsAreasList" class="flex flex-wrap gap-1.5 pt-1"></div>
+        </div>
+
+        <!-- Sliders de Opacidad y Blur -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <div class="flex justify-between text-[11px] text-slate-300 mb-1">
+              <span>Opacidad fondo</span>
+              <span id="lblOpacity" class="font-mono accent-text">84%</span>
+            </div>
+            <input id="sliderOpacity" type="range" min="15" max="98" value="84"
+                   oninput="window.AppSettingsUI.setOpacity(this.value)"
+                   class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+          <div>
+            <div class="flex justify-between text-[11px] text-slate-300 mb-1">
+              <span>Blur cristal</span>
+              <span id="lblBlur" class="font-mono accent-text">20px</span>
+            </div>
+            <input id="sliderBlur" type="range" min="0" max="32" value="20"
+                   oninput="window.AppSettingsUI.setBlur(this.value)"
+                   class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+          </div>
+        </div>
+      </div>
+
+      <!-- Notificación interna -->
+      <div id="toastCapture" class="hidden mx-3 mt-2 px-3 py-2 rounded-xl btn-accent-soft text-[11px] flex items-center justify-between animate-card">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-check-circle"></i>
+          <span id="toastCaptureText">¡Guardado en automático!</span>
+        </div>
+        <span class="text-[10px] font-mono font-bold">OK</span>
+      </div>
+
+      <!-- 4. LISTA DE PENDIENTES CON SCROLL -->
+      <div id="tasksFeed" class="no-drag flex-1 overflow-y-auto p-3 space-y-2.5">
+        <!-- Tarjetas generadas dinámicamente -->
+      </div>
+
+      <!-- 5. PIE DEL SIDEBAR -->
+      <footer class="no-drag px-3 py-2 bg-slate-950/60 border-t border-white/10 flex items-center justify-between text-[11px]">
+        <button type="button" onclick="window.AppTaskManager.exportTasksToExcelCSV()"
+                class="px-2.5 py-1 rounded-lg btn-accent-soft text-[10px] font-semibold flex items-center gap-1.5"
+                title="Descargar todos los pendientes en Excel (.CSV)">
+          <i class="fa-solid fa-file-excel"></i>
+          <span>Exportar Excel</span>
+        </button>
+
+        <div class="flex items-center gap-1 text-[10px] text-slate-400">
+          <span>Pega con</span>
+          <kbd class="px-1.5 py-0.5 rounded bg-white/10 accent-text font-mono border border-white/10">Ctrl+V</kbd>
+          <span>o arrastra</span>
+        </div>
+      </footer>
+    </section>
+
+  </div>
+
+  <!-- SCRIPTS MODULARES -->
+  <script src="./js/state.js"></script>
+  <script src="./js/parser.js"></script>
+  <script src="./js/taskManager.js"></script>
+  <script src="./js/settingsUI.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>
