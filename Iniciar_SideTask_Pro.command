@@ -1,8 +1,18 @@
 #!/bin/bash
 # ============================================================================
-# LANZADOR DE SIDETASK PRO PARA MACOS (Reinicia procesos viejos y actualiza)
+# LANZADOR DE SIDETASK PRO PARA MACOS (Soporta NVM, Homebrew e Instalador PKG)
 # ============================================================================
 cd "$(dirname "$0")"
+
+# Cargar rutas de Node.js (NVM, Homebrew Apple Silicon / Intel y rutas estándar)
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  \. "$NVM_DIR/nvm.sh"
+fi
+
+# Quitar cuarentena de Gatekeeper si existe
+xattr -cr . 2>/dev/null || true
 
 echo "Cerrando cualquier instancia anterior en segundo plano..."
 pkill -9 -f "Sidebar-Pendientes" 2>/dev/null || true
@@ -20,7 +30,7 @@ if [ ! -d "node_modules" ]; then
   npm install
 fi
 
-echo "Abriendo SideTask Pro actualizado en macOS..."
+echo "Abriendo SideTask Pro en macOS..."
 nohup ./node_modules/.bin/electron . >/dev/null 2>&1 &
 disown
 sleep 1
