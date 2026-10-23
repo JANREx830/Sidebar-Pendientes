@@ -7,7 +7,7 @@ const { setupIpcHandlers } = require('./ipc');
 // Bandera para diferenciar cuando la app se cierra intencionalmente (Tray o Cmd+Q en Mac)
 app.isQuitting = false;
 
-// En macOS es OBLIGATORIO definir el menú de edición para que el sistema operativo permita Cmd+C y Cmd+V
+// En macOS configuramos el menú nativo para que Cmd+V capture directamente el portapapeles en la barra
 function setupAppMenu() {
   if (process.platform === 'darwin') {
     const template = [
@@ -15,8 +15,6 @@ function setupAppMenu() {
         label: app.name || 'SideTask Pro',
         submenu: [
           { role: 'about', label: 'Acerca de SideTask Pro' },
-          { type: 'separator' },
-          { role: 'services', label: 'Servicios' },
           { type: 'separator' },
           { role: 'hide', label: 'Ocultar SideTask Pro' },
           { role: 'hideOthers', label: 'Ocultar otros' },
@@ -33,7 +31,16 @@ function setupAppMenu() {
           { type: 'separator' },
           { role: 'cut', label: 'Cortar' },
           { role: 'copy', label: 'Copiar' },
-          { role: 'paste', label: 'Pegar' },
+          {
+            label: 'Pegar pendiente',
+            accelerator: 'CommandOrControl+V',
+            click: () => {
+              const win = getMainWindow();
+              if (win && !win.isDestroyed()) {
+                win.webContents.send('trigger-paste-from-menu');
+              }
+            }
+          },
           { role: 'selectAll', label: 'Seleccionar todo' }
         ]
       }

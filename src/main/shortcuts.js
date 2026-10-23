@@ -1,7 +1,7 @@
 const { globalShortcut, clipboard } = require('electron');
 const { getMainWindow, setSidebarExpandedState, setWindowIgnoreMouseSafe } = require('./window');
 
-const CAPTURE_SHORTCUT = 'CommandOrControl+Shift+D';
+const SHORTCUTS = ['CommandOrControl+Shift+D', 'CommandOrControl+Shift+V'];
 
 function captureAndSendToRenderer() {
   const win = getMainWindow();
@@ -26,15 +26,14 @@ function captureAndSendToRenderer() {
 
 function registerShortcuts() {
   globalShortcut.unregisterAll();
-  const registered = globalShortcut.register(CAPTURE_SHORTCUT, () => {
-    captureAndSendToRenderer();
+  SHORTCUTS.forEach((sc) => {
+    const registered = globalShortcut.register(sc, () => {
+      captureAndSendToRenderer();
+    });
+    if (registered) {
+      console.log(`[Shortcuts] Atajo global registrado: ${sc}`);
+    }
   });
-
-  if (!registered) {
-    console.warn(`[Shortcuts] No se pudo registrar el atajo global: ${CAPTURE_SHORTCUT}`);
-  } else {
-    console.log(`[Shortcuts] Atajo global registrado: ${CAPTURE_SHORTCUT}`);
-  }
 }
 
 function unregisterShortcuts() {

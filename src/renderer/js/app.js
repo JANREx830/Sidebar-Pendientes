@@ -183,20 +183,40 @@ function setupPasteAndDragDrop() {
   const pasteZone = document.getElementById('pasteDropZone');
   const quickPasteInput = document.getElementById('quickPasteInput');
 
+  const isTypingInNormalInput = () => {
+    const activeEl = document.activeElement;
+    return Boolean(activeEl && (
+      activeEl.id === 'searchInput' ||
+      activeEl.id === 'manualSender' ||
+      activeEl.id === 'manualText' ||
+      activeEl.id === 'newAreaInput' ||
+      activeEl.id === 'quickNewAreaInput' ||
+      (activeEl.id && activeEl.id.startsWith('edit-'))
+    ));
+  };
+
+  // Escuchar Cmd+V desde el menú nativo de macOS
+  if (window.electronAPI && window.electronAPI.onTriggerPasteFromMenu) {
+    window.electronAPI.onTriggerPasteFromMenu(async () => {
+      if (isTypingInNormalInput()) {
+        const activeEl = document.activeElement;
+        const clip = await window.electronAPI.readClipboardNow();
+        if (clip && activeEl && typeof activeEl.value === 'string') {
+          const start = activeEl.selectionStart ?? activeEl.value.length;
+          const end = activeEl.selectionEnd ?? activeEl.value.length;
+          activeEl.value = activeEl.value.slice(0, start) + clip + activeEl.value.slice(end);
+          activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        return;
+      }
+      await captureClipboardManual();
+    });
+  }
+
   // Soporte directo para atajo de teclado Cmd+V (Mac) y Ctrl+V (Windows)
   window.addEventListener('keydown', async (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key && e.key.toLowerCase() === 'v') {
-      const activeEl = document.activeElement;
-      const isOtherInput = activeEl && (
-        activeEl.id === 'searchInput' ||
-        activeEl.id === 'manualSender' ||
-        activeEl.id === 'manualText' ||
-        activeEl.id === 'newAreaInput' ||
-        activeEl.id === 'quickNewAreaInput' ||
-        (activeEl.id && activeEl.id.startsWith('edit-'))
-      );
-
-      if (!isOtherInput) {
+      if (!isTypingInNormalInput()) {
         e.preventDefault();
         await captureClipboardManual();
       }

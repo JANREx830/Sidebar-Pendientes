@@ -5,6 +5,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onClipboardCapture: (callback) => {
     ipcRenderer.on('clipboard-capture', (_event, text) => callback(text));
   },
+  onTriggerPasteFromMenu: (callback) => {
+    ipcRenderer.on('trigger-paste-from-menu', () => callback());
+  },
   onWindowLayoutUpdated: (callback) => {
     ipcRenderer.on('window-layout-updated', (_event, layout) => callback(layout));
   },
