@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * CONFIGURACIÓN VISUAL, CONTROL DE EXPANDIR/COLAPSAR Y ÁREAS DINÁMICAS
+ * CONFIGURACIÓN VISUAL, ORIENTACIÓN VERTICAL/HORIZONTAL Y ÁREAS DINÁMICAS
  * ============================================================================
  */
 
@@ -22,7 +22,7 @@ function applySettingsToDOM() {
 
   document.documentElement.style.setProperty('--accent-color', hex);
   document.documentElement.style.setProperty('--accent-rgb', rgb);
-  document.documentElement.style.setProperty('--sidebar-opacity', (settings.opacity || 84) / 100);
+  document.documentElement.style.setProperty('--sidebar-opacity', (settings.opacity || 88) / 100);
   document.documentElement.style.setProperty('--sidebar-blur', `${settings.blur ?? 20}px`);
 
   const picker = document.getElementById('customColorPicker');
@@ -42,17 +42,73 @@ function applySettingsToDOM() {
     lBl.textContent = `${settings.blur}px`;
   }
 
-  const apiInput = document.getElementById('geminiApiKeyInput');
-  const aiStatus = document.getElementById('aiModeStatus');
-  if (apiInput && aiStatus) {
-    apiInput.value = settings.geminiApiKey || '';
-    aiStatus.textContent = settings.geminiApiKey ? 'Gemini AI + Fallback Activo' : 'Heurística Local 0ms';
-  }
-
   updatePinButtonUI();
+  applyOrientationClasses(settings.orientation || 'vertical', settings.dockSide || 'right');
 
   if (window.AppTaskManager && window.AppTaskManager.populateAreaSelects) {
     window.AppTaskManager.populateAreaSelects();
+  }
+}
+
+function applyOrientationClasses(orientation, dockSide) {
+  const shell = document.getElementById('sidebarShell');
+  if (!shell) return;
+
+  const isHorizontal = orientation === 'horizontal';
+  shell.classList.toggle('horizontal', isHorizontal);
+  shell.classList.toggle('vertical', !isHorizontal);
+
+  // Actualizar iconos según orientación y lado donde está pegada la barra
+  const iconExpand = document.getElementById('iconExpandRail');
+  const iconCollapse = document.getElementById('iconCollapseHeader');
+  const iconOrient = document.getElementById('iconOrientationRail');
+  const iconResize = document.getElementById('iconRailResize');
+
+  if (iconExpand) {
+    if (isHorizontal) {
+      iconExpand.className = dockSide === 'bottom'
+        ? 'fa-solid fa-angles-up text-sm'
+        : 'fa-solid fa-angles-down text-sm';
+    } else {
+      iconExpand.className = dockSide === 'left'
+        ? 'fa-solid fa-angles-right text-sm'
+        : 'fa-solid fa-angles-left text-sm';
+    }
+  }
+
+  if (iconCollapse) {
+    if (isHorizontal) {
+      iconCollapse.className = dockSide === 'bottom'
+        ? 'fa-solid fa-angles-down'
+        : 'fa-solid fa-angles-up';
+    } else {
+      iconCollapse.className = dockSide === 'left'
+        ? 'fa-solid fa-angles-left'
+        : 'fa-solid fa-angles-right';
+    }
+  }
+
+  if (iconOrient) {
+    iconOrient.className = isHorizontal
+      ? 'fa-solid fa-arrows-up-down text-xs'
+      : 'fa-solid fa-arrows-left-right text-xs';
+  }
+
+  if (iconResize) {
+    iconResize.className = isHorizontal
+      ? 'fa-solid fa-grip-lines-vertical'
+      : 'fa-solid fa-grip-lines';
+  }
+}
+
+function toggleOrientation() {
+  if (window.electronAPI && window.electronAPI.toggleOrientation) {
+    window.electronAPI.toggleOrientation();
+  } else {
+    const next = window.AppState.settings.orientation === 'horizontal' ? 'vertical' : 'horizontal';
+    window.AppState.settings.orientation = next;
+    applyOrientationClasses(next, next === 'horizontal' ? 'top' : 'right');
+    persistSettings();
   }
 }
 
@@ -97,7 +153,6 @@ function setApiKey(val) {
 function startEditCustomArea(areaName) {
   editingAreaOldName = areaName;
 
-  // Abrir el panel rápido si ambos están cerrados
   const quickPanel = document.getElementById('quickAreasPanel');
   const settingsDrawer = document.getElementById('settingsDrawer');
   const isSettingsOpen = settingsDrawer && !settingsDrawer.classList.contains('hidden');
@@ -145,13 +200,11 @@ async function addCustomArea(rawName) {
     window.AppState.settings.areas = ['Refacciones', 'Sistemas'];
   }
 
-  // Si estamos editando una opción existente
   if (editingAreaOldName) {
     const oldName = editingAreaOldName;
     const idx = window.AppState.settings.areas.indexOf(oldName);
     if (idx !== -1) {
       window.AppState.settings.areas[idx] = name;
-      // Actualizar también las tareas que tenían esa opción
       window.AppState.tasks.forEach(t => {
         if (t.area === oldName) t.area = name;
       });
@@ -235,35 +288,24 @@ function toggleQuickAreasPanel() {
   }
 }
 
-// 3. CONTROL DE ESTADOS VISUALES (EXPANDIDO 410px vs COLAPSADO 68px)
+// 3. CONTROL DE ESTADOS VISUALES (EXPANDIDO vs COLAPSADO)
 function setExpanded(expanded) {
   window.AppState.isExpanded = Boolean(expanded);
   const shell = document.getElementById('sidebarShell');
-  const toggleBtn = document.getElementById('toggleFloatBtn');
+
+  if (shell) {
+    shell.classList.toggle('expanded', window.AppState.isExpanded);
+    shell.classList.toggle('collapsed', !window.AppState.isExpanded);
+  }
 
   if (window.electronAPI && window.electronAPI.setExpandedState) {
     window.electronAPI.setExpandedState(window.AppState.isExpanded);
   }
-  if (window.AppState.isExpanded && window.electronAPI && window.electronAPI.setIgnoreMouseEvents) {
-    window.electronAPI.setIgnoreMouseEvents(false);
-  }
 
-  if (shell) {
-    if (window.AppState.isExpanded) {
-      shell.classList.remove('collapsed');
-      shell.classList.add('expanded');
-    } else {
-      shell.classList.remove('expanded');
-      shell.classList.add('collapsed');
-    }
-  }
-
-  if (toggleBtn) {
-    toggleBtn.innerHTML = window.AppState.isExpanded
-      ? '<i class="fa-solid fa-chevron-right text-[11px]"></i>'
-      : '<i class="fa-solid fa-chevron-left text-[11px]"></i>';
-    toggleBtn.title = window.AppState.isExpanded ? 'Colapsar barra (68px)' : 'Expandir barra (410px)';
-  }
+  applyOrientationClasses(
+    window.AppState.settings.orientation || 'vertical',
+    window.AppState.settings.dockSide || 'right'
+  );
 
   if (window.AppTaskManager && typeof window.AppTaskManager.updateStatusCounters === 'function') {
     window.AppTaskManager.updateStatusCounters();
@@ -283,7 +325,7 @@ function toggleAutoCollapseLock() {
   window.AppTaskManager.triggerToast(
     window.AppState.settings.autoCollapseOnLeave
       ? 'Auto-colapso al sacar el mouse: Activado'
-      : 'Fijado: No se cierra solo al sacar el mouse'
+      : 'Estático: No se cierra solo al sacar el mouse'
   );
 }
 
@@ -295,11 +337,11 @@ function updatePinButtonUI() {
   if (isAuto) {
     btn.className = 'w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 text-slate-400 flex items-center justify-center text-[11px] transition';
     btn.innerHTML = '<i class="fa-solid fa-lock-open text-[10px]"></i>';
-    btn.title = 'Auto-colapsa al sacar el mouse (Clic para fijar)';
+    btn.title = 'Auto-colapsa al sacar el mouse (Clic para dejar fijo)';
   } else {
     btn.className = 'w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px] transition';
     btn.innerHTML = '<i class="fa-solid fa-lock text-[10px]"></i>';
-    btn.title = 'Fijado abierto (Clic para activar auto-colapso)';
+    btn.title = 'Fijado estático (Clic para activar auto-colapso)';
   }
 }
 
@@ -324,6 +366,8 @@ function closeWindow() {
 
 window.AppSettingsUI = {
   applySettingsToDOM,
+  applyOrientationClasses,
+  toggleOrientation,
   setAccentColor,
   setOpacity,
   setBlur,

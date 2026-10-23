@@ -1,14 +1,12 @@
 /**
  * ============================================================================
- * ORQUESTADOR PRINCIPAL: PEGAR (CTRL+V), ARRASTRAR CON MOUSE Y EVENTOS
+ * ORQUESTADOR PRINCIPAL: PEGAR, ARRASTRAR, ORIENTACIÓN ADAPTATIVA Y TAMAÑO
  * ============================================================================
  */
 
 let leaveCollapseTimer = null;
 let autoCaptureExpandTimer = null;
-let isMouseInsideShell = false;
-let isDraggingHandle = false;
-let lastIgnoreMouseState = null;
+let isDraggingOrResizing = false;
 
 window.addEventListener('DOMContentLoaded', async () => {
   await loadInitialStorage();
@@ -16,15 +14,37 @@ window.addEventListener('DOMContentLoaded', async () => {
   window.AppTaskManager.populateAreaSelects();
   window.AppTaskManager.renderTaskList();
 
-  // Iniciar expandido para que el usuario vea la barra lista, o colapsable con un clic
   window.AppSettingsUI.setExpanded(true);
 
   setupEventListeners();
   setupPasteAndDragDrop();
-  setupClickThroughDetection();
-  setupDragHandle();
-  setupCollapsedRailDrag();
+  setupWindowDragAndResize();
   applyPlatformLabels();
+
+  // Escuchar cambios de orientación desde el proceso principal (cuando el usuario mueve la barra arriba/abajo/lados)
+  if (window.electronAPI && window.electronAPI.onWindowLayoutUpdated) {
+    window.electronAPI.onWindowLayoutUpdated((layout) => {
+      if (!layout) return;
+      const prevOrientation = window.AppState.settings.orientation;
+      window.AppState.settings.orientation = layout.orientation || 'vertical';
+      window.AppState.settings.dockSide = layout.dockSide || 'right';
+      window.AppState.settings.collapsedLength = layout.collapsedLength || 460;
+      window.AppState.settings.expandedWidth = layout.expandedWidth || 400;
+      window.AppState.settings.expandedHeight = layout.expandedHeight || 600;
+
+      window.AppSettingsUI.applyOrientationClasses(
+        window.AppState.settings.orientation,
+        window.AppState.settings.dockSide
+      );
+
+      if (prevOrientation && prevOrientation !== layout.orientation) {
+        const label = layout.orientation === 'horizontal'
+          ? 'Barra adaptada a modo Horizontal ↔'
+          : 'Barra adaptada a modo Vertical ↕';
+        window.AppTaskManager.triggerToast(label);
+      }
+    });
+  }
 
   // Revisar cada 30 segundos si ya dieron las 6:00 PM (18:00 hrs) para pasar los pendientes a URGENTES
   setInterval(() => {
@@ -37,7 +57,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }, 30000);
 });
 
-// 1. Cargar datos iniciales (Sin ejemplos demo)
+// 1. Cargar datos iniciales independientes por computadora
 async function loadInitialStorage() {
   try {
     if (window.electronAPI && window.electronAPI.getSettings) {
@@ -69,337 +89,166 @@ async function loadInitialStorage() {
   }
 }
 
-// 2. CLICK-THROUGH EN ZONA TRANSPARENTE
-function setMouseIgnoreSafe(shouldIgnore) {
-  if (lastIgnoreMouseState === shouldIgnore) return;
-  lastIgnoreMouseState = shouldIgnore;
-  if (window.electronAPI && window.electronAPI.setIgnoreMouseEvents) {
-    window.electronAPI.setIgnoreMouseEvents(shouldIgnore, { forward: true });
-  }
-}
+// 2. MOVER LA BARRA (ARRIBA/ABAJO = HORIZONTAL, IZQ/DER = VERTICAL) Y ACHICARLA HASTA CIERTO PUNTO
+function setupWindowDragAndResize() {
+  if (!window.electronAPI) return;
 
-function setupClickThroughDetection() {
-  if (!window.electronAPI || !window.electronAPI.setIgnoreMouseEvents) return;
+  const railMoveHandle = document.getElementById('railMoveHandle');
+  const collapsedRail = document.getElementById('collapsedRail');
+  const expandedHeaderDrag = document.getElementById('expandedHeaderDrag');
+  const railResizeHandle = document.getElementById('railResizeHandle');
 
-  const shell = document.getElementById('sidebarShell');
+  let activeMode = null; // 'drag' | 'resize'
 
-  window.addEventListener('mousemove', (e) => {
-    if (!shell) return;
+  const startDrag = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    activeMode = 'drag';
+    isDraggingOrResizing = true;
+    window.electronAPI.startWindowDrag();
+  };
 
-    if (window.AppState.isExpanded || isDraggingHandle) {
-      setMouseIgnoreSafe(false);
-      return;
+  const startResize = (direction) => (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    activeMode = 'resize';
+    isDraggingOrResizing = true;
+    window.electronAPI.startWindowResize(direction);
+  };
+
+  const stopAll = () => {
+    if (!activeMode) return;
+    if (activeMode === 'drag') {
+      window.electronAPI.stopWindowDrag();
+    } else if (activeMode === 'resize') {
+      window.electronAPI.stopWindowResize();
     }
+    activeMode = null;
+    isDraggingOrResizing = false;
+  };
 
-    const shellRect = shell.getBoundingClientRect();
-    const overInteractive = (
-      e.clientX >= (shellRect.left - 24) &&
-      e.clientX <= shellRect.right &&
-      e.clientY >= shellRect.top &&
-      e.clientY <= shellRect.bottom
-    );
-
-    setMouseIgnoreSafe(!overInteractive);
-  });
-}
-
-function isUserEditingOrFormOpen() {
-  const manualPanel = document.getElementById('manualFormPanel');
-  const settingsDrawer = document.getElementById('settingsDrawer');
-  const quickAreasPanel = document.getElementById('quickAreasPanel');
-
-  if (manualPanel && !manualPanel.classList.contains('hidden')) return true;
-  if (settingsDrawer && !settingsDrawer.classList.contains('hidden')) return true;
-  if (quickAreasPanel && !quickAreasPanel.classList.contains('hidden')) return true;
-
-  const openEditPanels = document.querySelectorAll('[id^="edit-panel-"]:not(.hidden)');
-  if (openEditPanels.length > 0) return true;
-
-  const activeEl = document.activeElement;
-  if (activeEl && activeEl.id !== 'quickPasteInput' && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName)) {
-    return true;
+  // Mover desde el botón de 4 flechas en modo colapsado
+  if (railMoveHandle) {
+    railMoveHandle.addEventListener('mousedown', startDrag);
   }
 
-  return false;
+  // Mover arrastrando cualquier espacio libre del riel colapsado
+  if (collapsedRail) {
+    collapsedRail.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest('button') || e.target.closest('#railResizeHandle')) return;
+      startDrag(e);
+    });
+  }
+
+  // Mover desde el encabezado superior cuando la barra está abierta
+  if (expandedHeaderDrag) {
+    expandedHeaderDrag.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest('button')) return;
+      startDrag(e);
+    });
+  }
+
+  // Achicar o alargar la barra cuando está encogida (cápsula vertical u horizontal)
+  if (railResizeHandle) {
+    railResizeHandle.addEventListener('mousedown', startResize('collapsed-end'));
+  }
+
+  // Achicar o agrandar el panel cuando está abierto (bordes y esquinas)
+  const resizeMap = [
+    { id: 'resizeLeft', dir: 'left' },
+    { id: 'resizeRight', dir: 'right' },
+    { id: 'resizeBottom', dir: 'bottom' },
+    { id: 'resizeCornerBL', dir: 'bottom-left' },
+    { id: 'resizeCornerBR', dir: 'bottom-right' }
+  ];
+
+  resizeMap.forEach(({ id, dir }) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('mousedown', startResize(dir));
+  });
+
+  window.addEventListener('mouseup', stopAll);
+  window.addEventListener('blur', stopAll);
 }
 
-// 3. PEGAR CON CTRL+V Y ARRASTRAR SELECCIÓN CON EL MOUSE (GUARDADO AUTOMÁTICO)
+// 3. PEGAR DIRECTO (CTRL+V / CMD+V) Y ARRASTRAR CON EL MOUSE (DRAG & DROP)
 function setupPasteAndDragDrop() {
   const pasteZone = document.getElementById('pasteDropZone');
   const quickPasteInput = document.getElementById('quickPasteInput');
+  const shell = document.getElementById('sidebarShell');
 
-  // 3.1 Escuchar Ctrl+V (evento paste) en toda la ventana
-  document.addEventListener('paste', async (e) => {
-    const active = document.activeElement;
-    // Si el usuario está pegando dentro del buscador, nueva área, edición o notas, permitir comportamiento normal
-    if (
-      active &&
-      ['searchInput', 'newAreaInput', 'quickNewAreaInput', 'manualSender', 'manualText', 'geminiApiKeyInput'].includes(active.id)
-    ) {
-      return;
-    }
-    if (active && active.id && (active.id.startsWith('notes-input-') || active.id.startsWith('edit-'))) {
-      return;
-    }
+  window.addEventListener('paste', async (e) => {
+    const activeEl = document.activeElement;
+    const isOtherInput = activeEl && (
+      activeEl.id === 'searchInput' ||
+      activeEl.id === 'manualSender' ||
+      activeEl.id === 'manualText' ||
+      activeEl.id === 'newAreaInput' ||
+      activeEl.id === 'quickNewAreaInput' ||
+      (activeEl.id && activeEl.id.startsWith('edit-'))
+    );
 
-    e.preventDefault();
+    if (isOtherInput) return;
+
     const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-    if (quickPasteInput) quickPasteInput.value = '';
-
     if (pastedText && pastedText.trim()) {
-      await processIncomingText(pastedText);
-    } else {
-      await captureClipboardManual();
+      e.preventDefault();
+      if (quickPasteInput) quickPasteInput.value = '';
+      await handleAutomaticCapture(pastedText);
     }
   });
 
-  // 3.2 Si el usuario escribe o pega directo en el cuadro de pegado rápido y presiona Enter
   if (quickPasteInput) {
     quickPasteInput.addEventListener('keydown', async (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && quickPasteInput.value.trim()) {
         e.preventDefault();
-        const val = quickPasteInput.value.trim();
-        if (val) {
-          quickPasteInput.value = '';
-          await processIncomingText(val);
-        }
+        const text = quickPasteInput.value.trim();
+        quickPasteInput.value = '';
+        await handleAutomaticCapture(text);
       }
     });
   }
 
-  // 3.3 Arrastrar texto seleccionado con el mouse desde cualquier programa y soltarlo en la barra
-  window.addEventListener('dragenter', (e) => {
-    e.preventDefault();
-    setMouseIgnoreSafe(false);
-    if (!window.AppState.isExpanded) {
-      window.AppSettingsUI.setExpanded(true);
-    }
-    if (pasteZone) pasteZone.classList.add('drag-over');
-  });
-
-  window.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    if (pasteZone) pasteZone.classList.add('drag-over');
-  });
-
-  window.addEventListener('dragleave', (e) => {
-    if (e.relatedTarget === null && pasteZone) {
-      pasteZone.classList.remove('drag-over');
-    }
-  });
-
-  window.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    if (pasteZone) pasteZone.classList.remove('drag-over');
-
-    const droppedText = e.dataTransfer
-      ? (e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text'))
-      : '';
-
-    if (droppedText && droppedText.trim()) {
-      await processIncomingText(droppedText);
-    }
-  });
-}
-
-// 4. AUTO-ABRIR / AUTO-COLAPSAR CON EL MOUSE
-function setupAutoCollapseHover() {
-  const shell = document.getElementById('sidebarShell');
-  if (!shell) return;
-
-  shell.addEventListener('mouseenter', () => {
-    isMouseInsideShell = true;
-    setMouseIgnoreSafe(false);
-    if (leaveCollapseTimer) {
-      clearTimeout(leaveCollapseTimer);
-      leaveCollapseTimer = null;
-    }
-    if (autoCaptureExpandTimer) {
-      clearTimeout(autoCaptureExpandTimer);
-      autoCaptureExpandTimer = null;
-    }
-  });
-
-  shell.addEventListener('mouseleave', () => {
-    isMouseInsideShell = false;
-    if (
-      window.AppState.settings.autoCollapseOnLeave &&
-      window.AppState.isExpanded &&
-      !isDraggingHandle &&
-      !isUserEditingOrFormOpen()
-    ) {
-      leaveCollapseTimer = setTimeout(() => {
-        if (!isMouseInsideShell && !isDraggingHandle && !isUserEditingOrFormOpen()) {
-          window.AppSettingsUI.setExpanded(false);
-        }
-      }, 400);
-    }
-  });
-}
-
-// 5. TIRADOR DE ARRASTRE EN EL BORDE IZQUIERDO (DRAG HANDLE)
-function setupDragHandle() {
-  const handle = document.getElementById('dragHandle');
-  const shell = document.getElementById('sidebarShell');
-  if (!handle || !shell) return;
-
-  let startX = 0;
-  let startWidth = 0;
-
-  handle.addEventListener('mousedown', (e) => {
-    isDraggingHandle = true;
-    setMouseIgnoreSafe(false);
-    startX = e.clientX;
-    startWidth = shell.offsetWidth;
-    handle.classList.add('dragging');
-    document.body.style.cursor = 'ew-resize';
-    e.preventDefault();
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (!isDraggingHandle) return;
-    const deltaX = startX - e.clientX;
-    const newWidth = Math.min(410, Math.max(68, startWidth + deltaX));
-    shell.style.width = `${newWidth}px`;
-  });
-
-  window.addEventListener('mouseup', () => {
-    if (!isDraggingHandle) return;
-    isDraggingHandle = false;
-    handle.classList.remove('dragging');
-    document.body.style.cursor = 'default';
-
-    const currentW = shell.offsetWidth;
-    shell.style.width = '';
-    if (currentW > 200) {
-      window.AppSettingsUI.setExpanded(true);
-    } else {
-      window.AppSettingsUI.setExpanded(false);
-    }
-  });
-}
-
-// 5.B FUNCIÓN PARA MOVER LA BARRA LIBREMENTE CUANDO ESTÁ ENCOGIDA (68px)
-function setupCollapsedRailDrag() {
-  const moveHandle = document.getElementById('railMoveHandle');
-  const rail = document.getElementById('collapsedRail');
-  let isMovingWindow = false;
-
-  function beginDrag(e) {
-    if (e.button !== 0) return; // Solo clic izquierdo
-    if (!window.electronAPI || !window.electronAPI.startWindowDrag) return;
-    isMovingWindow = true;
-    setMouseIgnoreSafe(false);
-    document.body.style.cursor = 'grabbing';
-    window.electronAPI.startWindowDrag();
-    e.preventDefault();
-  }
-
-  function endDrag() {
-    if (!isMovingWindow) return;
-    isMovingWindow = false;
-    document.body.style.cursor = 'default';
-    if (window.electronAPI && window.electronAPI.stopWindowDrag) {
-      window.electronAPI.stopWindowDrag();
-    }
-  }
-
-  // Arrastrar desde el ícono de mover (✥)
-  if (moveHandle) {
-    moveHandle.addEventListener('mousedown', beginDrag);
-  }
-
-  // También permitir arrastrar desde cualquier espacio libre de la barra encogida
-  if (rail) {
-    rail.addEventListener('mousedown', (e) => {
-      if (!e.target.closest('button')) {
-        beginDrag(e);
-      }
-    });
-  }
-
-  window.addEventListener('mouseup', endDrag);
-  window.addEventListener('blur', endDrag);
-}
-
-// 6. PROCESAR Y GUARDAR EN AUTOMÁTICO EL TEXTO PEGADO O CAPTURADO
-async function processIncomingText(rawText) {
-  setMouseIgnoreSafe(false);
-  window.AppSettingsUI.setExpanded(true);
-
-  if (!rawText || !rawText.trim()) {
-    window.AppTaskManager.triggerToast('Copia un mensaje primero (Ctrl+C) y luego pega con Ctrl+V');
-    return;
-  }
-
-  const parsed = await window.AppParser.parseMessageSmart(
-    rawText,
-    window.AppState.settings.geminiApiKey
-  );
-
-  const newTask = {
-    id: 't-' + Date.now(),
-    createdAt: Date.now(),
-    sender: parsed.sender,
-    text: parsed.text,
-    notes: '',
-    area: parsed.area,
-    urgency: parsed.urgency,
-    status: 'pendiente',
-    dateTimeFormatted: parsed.dateTimeFormatted,
-    timestamp: parsed.timestamp,
-    date: parsed.date
-  };
-
-  window.AppState.tasks.unshift(newTask);
-  await window.AppTaskManager.persistTasks();
-  window.AppTaskManager.renderTaskList();
-
-  const shell = document.getElementById('sidebarShell');
   if (shell) {
-    shell.classList.remove('capture-flash');
-    void shell.offsetWidth;
-    shell.classList.add('capture-flash');
-  }
+    shell.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      if (pasteZone) pasteZone.classList.add('drag-over');
+    });
 
-  window.AppTaskManager.triggerToast(`Guardado: ${parsed.sender} (${parsed.area})`);
-}
+    shell.addEventListener('dragleave', () => {
+      if (pasteZone) pasteZone.classList.remove('drag-over');
+    });
 
-// 7. Captura desde el portapapeles con 1 clic
-async function captureClipboardManual() {
-  let clipText = '';
-  if (window.electronAPI && window.electronAPI.readClipboardNow) {
-    clipText = await window.electronAPI.readClipboardNow();
-  } else {
-    try {
-      clipText = await navigator.clipboard.readText();
-    } catch (e) {
-      clipText = '';
-    }
-  }
+    shell.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      if (pasteZone) pasteZone.classList.remove('drag-over');
 
-  await processIncomingText(clipText);
-}
-
-// 8. Configuración de eventos
-function setupEventListeners() {
-  if (window.electronAPI && typeof window.electronAPI.onClipboardCapture === 'function') {
-    window.electronAPI.onClipboardCapture(async (rawText) => {
-      await processIncomingText(rawText);
+      const droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text');
+      if (droppedText && droppedText.trim()) {
+        await handleAutomaticCapture(droppedText);
+      }
     });
   }
+}
 
-  setupAutoCollapseHover();
-
-  const btnCapture = document.getElementById('btnCaptureNow');
-  if (btnCapture) btnCapture.addEventListener('click', captureClipboardManual);
-
+// 4. EVENTOS GENERALES DE INTERFAZ
+function setupEventListeners() {
   const searchInput = document.getElementById('searchInput');
   const btnClearSearch = document.getElementById('btnClearSearch');
+  const areaSelect = document.getElementById('areaFilterSelect');
+  const btnCaptureNow = document.getElementById('btnCaptureNow');
+  const shell = document.getElementById('sidebarShell');
+
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
-      window.AppState.filters.search = e.target.value;
-      if (btnClearSearch) btnClearSearch.classList.toggle('hidden', !e.target.value);
+      const val = e.target.value;
+      window.AppState.filters.search = val;
+      if (btnClearSearch) btnClearSearch.classList.toggle('hidden', !val);
       window.AppTaskManager.renderTaskList();
     });
   }
@@ -413,7 +262,6 @@ function setupEventListeners() {
     });
   }
 
-  const areaSelect = document.getElementById('areaFilterSelect');
   if (areaSelect) {
     areaSelect.addEventListener('change', (e) => {
       window.AppState.filters.area = e.target.value;
@@ -421,30 +269,126 @@ function setupEventListeners() {
       window.AppTaskManager.renderTaskList();
     });
   }
+
+  if (btnCaptureNow) {
+    btnCaptureNow.addEventListener('click', captureClipboardManual);
+  }
+
+  if (shell) {
+    shell.addEventListener('mouseenter', () => {
+      if (leaveCollapseTimer) {
+        clearTimeout(leaveCollapseTimer);
+        leaveCollapseTimer = null;
+      }
+    });
+
+    shell.addEventListener('mouseleave', () => {
+      if (isDraggingOrResizing) return;
+      if (window.AppState.settings.autoCollapseOnLeave && window.AppState.isExpanded) {
+        leaveCollapseTimer = setTimeout(() => {
+          window.AppSettingsUI.setExpanded(false);
+        }, 450);
+      }
+    });
+  }
+
+  if (window.electronAPI && window.electronAPI.onClipboardCapture) {
+    window.electronAPI.onClipboardCapture(async (rawText) => {
+      await handleAutomaticCapture(rawText);
+    });
+  }
 }
 
+// 5. CAPTURA AUTOMÁTICA Y GUARDADO INMEDIATO
+async function handleAutomaticCapture(rawText) {
+  if (!rawText || !rawText.trim()) {
+    window.AppTaskManager.triggerToast('El portapapeles está vacío');
+    return;
+  }
+
+  const wasCollapsed = !window.AppState.isExpanded;
+  window.AppSettingsUI.setExpanded(true);
+
+  if (wasCollapsed && window.AppState.settings.autoCollapseOnLeave) {
+    if (autoCaptureExpandTimer) clearTimeout(autoCaptureExpandTimer);
+    autoCaptureExpandTimer = setTimeout(() => {
+      window.AppSettingsUI.setExpanded(false);
+    }, 5000);
+  }
+
+  const parsed = await window.AppParser.parseIncomingText(rawText);
+
+  const selectedAreaFilter = window.AppState.filters.area;
+  const finalArea = (selectedAreaFilter && selectedAreaFilter !== 'all')
+    ? selectedAreaFilter
+    : parsed.area;
+
+  const newTask = {
+    id: 't-' + Date.now(),
+    createdAt: Date.now(),
+    sender: parsed.sender,
+    text: parsed.text,
+    notes: '',
+    area: finalArea,
+    urgency: parsed.urgency,
+    status: 'pendiente',
+    dateTimeFormatted: parsed.dateTimeFormatted,
+    timestamp: parsed.timestamp,
+    date: parsed.date
+  };
+
+  window.AppState.tasks.unshift(newTask);
+  await window.AppTaskManager.persistTasks();
+  window.AppTaskManager.renderTaskList();
+  window.AppTaskManager.triggerToast(`Guardado: ${newTask.sender} (${newTask.area})`);
+}
+
+async function captureClipboardManual() {
+  try {
+    let text = '';
+    if (window.electronAPI && window.electronAPI.readClipboardNow) {
+      text = await window.electronAPI.readClipboardNow();
+    } else if (navigator.clipboard && navigator.clipboard.readText) {
+      text = await navigator.clipboard.readText();
+    }
+    if (!text || !text.trim()) {
+      window.AppTaskManager.triggerToast('Copia un texto primero (Ctrl+C)');
+      return;
+    }
+    await handleAutomaticCapture(text);
+  } catch (err) {
+    window.AppTaskManager.triggerToast('Presiona Ctrl+V directamente en la barra');
+  }
+}
+
+// 6. FILTROS Y FORMULARIO MANUAL (+)
 function setStatusFilter(status) {
   window.AppState.filters.status = status;
+  window.AppState.filters.urgencyOnly = null;
+
   ['all', 'pendiente', 'proceso', 'resuelto'].forEach(st => {
-    const tab = document.getElementById(`tab-${st}`);
-    if (tab) {
-      tab.className = st === status
-        ? 'status-tab status-tab-active py-1 rounded-lg transition'
-        : 'status-tab status-tab-inactive py-1 rounded-lg transition';
+    const btn = document.getElementById(`tab-${st}`);
+    if (!btn) return;
+    if (st === status) {
+      btn.className = 'status-tab status-tab-active py-1 rounded-lg transition';
+    } else {
+      btn.className = 'status-tab status-tab-inactive py-1 rounded-lg transition';
     }
   });
+
   window.AppTaskManager.renderTaskList();
 }
 
 function toggleManualForm() {
-  setMouseIgnoreSafe(false);
   window.AppSettingsUI.setExpanded(true);
   const panel = document.getElementById('manualFormPanel');
   if (panel) {
     panel.classList.toggle('hidden');
     if (!panel.classList.contains('hidden')) {
-      const input = document.getElementById('manualText');
-      if (input) setTimeout(() => input.focus(), 50);
+      const isAfterSix = new Date().getHours() >= 18;
+      setFormUrgency(isAfterSix ? 'Alta' : 'Media');
+      const senderInput = document.getElementById('manualSender');
+      if (senderInput) senderInput.focus();
     }
   }
 }
@@ -453,18 +397,19 @@ function setFormUrgency(level) {
   window.AppState.manualUrgency = level;
   ['Alta', 'Media', 'Baja'].forEach(l => {
     const btn = document.getElementById(`uBtn-${l}`);
-    if (btn) {
-      btn.className = l === level
-        ? 'px-2 py-0.5 rounded btn-accent text-[10px]'
-        : 'px-2 py-0.5 rounded bg-slate-800 border border-white/10 text-slate-400 text-[10px]';
+    if (!btn) return;
+    if (l === level) {
+      btn.className = 'px-2 py-0.5 rounded btn-accent text-[10px]';
+    } else {
+      btn.className = 'px-2 py-0.5 rounded bg-slate-800 border border-white/10 text-slate-400 text-[10px]';
     }
   });
 }
 
 async function submitManualTask() {
   const senderInput = document.getElementById('manualSender');
-  const areaSelect = document.getElementById('manualArea');
   const textInput = document.getElementById('manualText');
+  const areaSelect = document.getElementById('manualArea');
 
   const text = (textInput ? textInput.value : '').trim();
   if (!text) {
@@ -476,7 +421,7 @@ async function submitManualTask() {
   const sender = (senderInput ? senderInput.value : '').trim() || 'Manual';
   const area = areaSelect ? areaSelect.value : (window.AppState.settings.areas[0] || 'General');
   const isNowAfterSix = new Date().getHours() >= 18;
-  const urgency = isNowAfterSix ? 'Alta' : 'Media';
+  const urgency = isNowAfterSix ? 'Alta' : (window.AppState.manualUrgency || 'Media');
   const nowTime = new Date().toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true });
   const nowDate = new Date().toLocaleDateString('es-MX');
 
@@ -524,15 +469,14 @@ function applyPlatformLabels() {
                 /Mac|iPod|iPhone|iPad/i.test(navigator.platform || '');
   if (!isMac) return;
 
-  const replaceCtrlWithCmd = (el) => {
-    if (!el) return;
-    if (el.title) el.title = el.title.replace(/Ctrl/g, 'Cmd ⌘');
-    if (el.innerHTML && el.children.length <= 2) {
-      el.innerHTML = el.innerHTML.replace(/Ctrl\s*\+\s*([CVD])/g, '⌘ + $1').replace(/Ctrl\+([CVD])/g, '⌘+$1');
-    }
-  };
+  const quickInput = document.getElementById('quickPasteInput');
+  if (quickInput && quickInput.placeholder) {
+    quickInput.placeholder = quickInput.placeholder.replace(/Ctrl\+V/g, 'Cmd ⌘ + V');
+  }
 
-  document.querySelectorAll('[title*="Ctrl"], .paste-drop-zone, .rail-paste-btn, .footer-status').forEach(replaceCtrlWithCmd);
+  document.querySelectorAll('kbd').forEach(k => {
+    k.textContent = k.textContent.replace(/Ctrl/g, '⌘');
+  });
 }
 
 window.setStatusFilter = setStatusFilter;

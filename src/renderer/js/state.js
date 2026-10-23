@@ -2,12 +2,17 @@ window.AppState = {
   tasks: [],
   settings: {
     accentColor: '#06b6d4',
-    opacity: 84,
+    opacity: 88,
     blur: 20,
     alwaysOnTop: true,
     geminiApiKey: '',
     autoCollapseOnLeave: false,
-    areas: ['Refacciones', 'Sistemas']
+    areas: ['Refacciones', 'Sistemas'],
+    orientation: 'vertical', // 'vertical' | 'horizontal'
+    dockSide: 'right',       // 'right' | 'left' | 'top' | 'bottom'
+    collapsedLength: 460,
+    expandedWidth: 400,
+    expandedHeight: 600
   },
   filters: {
     status: 'all',
@@ -15,7 +20,7 @@ window.AppState = {
     search: '',
     urgencyOnly: null
   },
-  isExpanded: false, // Inicia colapsado (68px)
-  manualUrgency: 'Alta',
+  isExpanded: true,
+  manualUrgency: 'Media',
   DEFAULT_TASKS: [] // Sin tareas de ejemplo
 };

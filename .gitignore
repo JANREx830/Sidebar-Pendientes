@@ -1,6 +1,9 @@
 # Dependencias
 node_modules/
 
+# Datos locales de usuario (para que Windows y Mac tengan sus propios datos separados)
+datos-guardados.json
+
 # Empaquetado y compilación
 dist/
 out/

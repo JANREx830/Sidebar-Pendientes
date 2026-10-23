@@ -5,7 +5,10 @@ const {
   setSidebarExpandedState,
   setWindowIgnoreMouseSafe,
   startWindowDrag,
-  stopWindowDrag
+  stopWindowDrag,
+  startWindowResize,
+  stopWindowResize,
+  toggleOrientation
 } = require('./window');
 const { captureAndSendToRenderer } = require('./shortcuts');
 
@@ -49,13 +52,27 @@ function setupIpcHandlers() {
     setWindowIgnoreMouseSafe(Boolean(ignore));
   });
 
-  // Mover ventana cuando está encogida o expandida
+  // Mover ventana cuando está encogida o expandida (detecta arriba/abajo -> horizontal, izq/der -> vertical)
   ipcMain.on('start-window-drag', () => {
     startWindowDrag();
   });
 
   ipcMain.on('stop-window-drag', () => {
     stopWindowDrag();
+  });
+
+  // Redimensionar ("achicar hasta cierto punto" o agrandar)
+  ipcMain.on('start-window-resize', (_event, direction) => {
+    startWindowResize(direction);
+  });
+
+  ipcMain.on('stop-window-resize', () => {
+    stopWindowResize();
+  });
+
+  // Girar entre Vertical y Horizontal manualmente
+  ipcMain.on('toggle-orientation', () => {
+    toggleOrientation();
   });
 }
 

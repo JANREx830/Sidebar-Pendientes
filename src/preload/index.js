@@ -5,6 +5,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onClipboardCapture: (callback) => {
     ipcRenderer.on('clipboard-capture', (_event, text) => callback(text));
   },
+  onWindowLayoutUpdated: (callback) => {
+    ipcRenderer.on('window-layout-updated', (_event, layout) => callback(layout));
+  },
   getTasks: () => ipcRenderer.invoke('get-tasks'),
   saveTasks: (tasks) => ipcRenderer.invoke('save-tasks', tasks),
   getSettings: () => ipcRenderer.invoke('get-settings'),
@@ -21,5 +24,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('set-ignore-mouse-events', ignore, options);
   },
   startWindowDrag: () => ipcRenderer.send('start-window-drag'),
-  stopWindowDrag: () => ipcRenderer.send('stop-window-drag')
+  stopWindowDrag: () => ipcRenderer.send('stop-window-drag'),
+  startWindowResize: (direction) => ipcRenderer.send('start-window-resize', direction),
+  stopWindowResize: () => ipcRenderer.send('stop-window-resize'),
+  toggleOrientation: () => ipcRenderer.send('toggle-orientation')
 });

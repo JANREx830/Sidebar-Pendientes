@@ -1,7 +1,7 @@
 :root {
   --accent-color: #06b6d4;
   --accent-rgb: 6, 182, 212;
-  --sidebar-opacity: 0.86;
+  --sidebar-opacity: 0.88;
   --sidebar-blur: 20px;
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -21,58 +21,33 @@ html, body {
   user-select: none;
 }
 
-.drag-region {
-  -webkit-app-region: drag;
-}
-
 .no-drag {
   -webkit-app-region: no-drag;
 }
 
-/* Cápsula principal: Collapsible Glassmorphism Rail */
+/* ============================================================================
+   CÁPSULA PRINCIPAL: OCUPA EL 100% DE LA VENTANA AJUSTADA (CERO VENTANA ATRÁS)
+   ============================================================================ */
 .sidebar-shell {
-  height: calc(100vh - 24px);
-  margin: 12px 12px 12px auto;
+  width: calc(100vw - 8px);
+  height: calc(100vh - 8px);
+  margin: 4px;
   border-radius: 20px;
   background: rgba(15, 23, 42, var(--sidebar-opacity));
   backdrop-filter: blur(var(--sidebar-blur));
   -webkit-backdrop-filter: blur(var(--sidebar-blur));
-  border: 1px solid rgba(var(--accent-rgb), 0.28);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(var(--accent-rgb), 0.18);
-  transition: width 280ms var(--ease-spring), box-shadow 280ms ease, background 280ms ease, border-color 280ms ease;
+  border: 1.5px solid rgba(var(--accent-rgb), 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  transition: background 220ms ease, border-color 220ms ease;
   position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-/* Estado Colapsado (68px de ancho) */
-.sidebar-shell.collapsed {
-  width: 68px !important;
-}
-
-/* Estado Expandido (410px de ancho, limpio de 1 sola columna) */
-.sidebar-shell.expanded {
-  width: 410px;
-}
-
-/* Tirador de arrastre para redimensionar (Drag Handle) */
-.drag-handle {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 7px;
-  cursor: ew-resize;
-  z-index: 50;
-  transition: background 180ms ease;
-}
-
-.drag-handle:hover, .drag-handle.dragging {
-  background: rgba(var(--accent-rgb), 0.45);
-}
-
-/* Riel Vertical de Iconos (Visible SOLO en modo colapsado de 68px) */
+/* ============================================================================
+   RIEL COLAPSADO: ADAPTABLE VERTICAL (IZQ/DER) Y HORIZONTAL (ARRIBA/ABAJO)
+   ============================================================================ */
 .rail-column {
   width: 100%;
   height: 100%;
@@ -80,40 +55,201 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 6px;
+  padding: 10px 6px;
   z-index: 20;
+  overflow: hidden;
 }
 
-.sidebar-shell.expanded .rail-column {
+.rail-main-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+.rail-main-group::-webkit-scrollbar {
   display: none;
 }
 
-/* Panel de Contenido Expandido (Visible en modo de 410px) */
+.rail-dynamic-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+}
+
+.rail-divider {
+  width: 28px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 2px 0;
+  flex-shrink: 0;
+}
+
+.rail-bottom-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.rail-resize-grip {
+  width: 36px;
+  height: 14px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(var(--accent-rgb), 0.75);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(var(--accent-rgb), 0.35);
+  cursor: ns-resize;
+  font-size: 10px;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+.rail-resize-grip:hover {
+  background: rgba(var(--accent-rgb), 0.22);
+  color: #ffffff;
+  border-color: var(--accent-color);
+}
+
+/* MODO HORIZONTAL (Cuando pones la barra ARRIBA o ABAJO de la pantalla) */
+.sidebar-shell.collapsed.horizontal .rail-column {
+  flex-direction: row;
+  padding: 6px 10px;
+}
+
+.sidebar-shell.collapsed.horizontal .rail-main-group {
+  flex-direction: row;
+  width: auto;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.sidebar-shell.collapsed.horizontal .rail-dynamic-group {
+  flex-direction: row;
+  width: auto;
+}
+
+.sidebar-shell.collapsed.horizontal .rail-divider {
+  width: 1px;
+  height: 28px;
+  margin: 0 2px;
+}
+
+.sidebar-shell.collapsed.horizontal .rail-bottom-group {
+  flex-direction: row;
+  width: auto;
+  padding-top: 0;
+  padding-left: 8px;
+  border-top: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-shell.collapsed.horizontal .rail-resize-grip {
+  width: 14px;
+  height: 36px;
+  cursor: ew-resize;
+}
+
+.sidebar-shell.expanded .rail-column {
+  display: none !important;
+}
+
+/* ============================================================================
+   PANEL DE CONTENIDO EXPANDIDO + BORDES PARA ACHICAR HASTA CIERTO PUNTO
+   ============================================================================ */
 .expanded-content-pane {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: opacity 220ms ease;
 }
 
 .sidebar-shell.collapsed .expanded-content-pane {
-  display: none;
-  opacity: 0;
-  pointer-events: none;
+  display: none !important;
 }
 
-.sidebar-shell.expanded .expanded-content-pane {
+/* Tiradores de redimensionamiento en modo expandido */
+.resize-edge-left {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 60;
+}
+.resize-edge-right {
+  position: absolute;
+  right: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 60;
+}
+.resize-edge-bottom {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 60;
+}
+.resize-corner-bl {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize;
+  z-index: 65;
+}
+.resize-corner-br {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  z-index: 65;
   display: flex;
-  opacity: 1;
-  pointer-events: auto;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 3px;
+  color: rgba(var(--accent-rgb), 0.65);
+  font-size: 9px;
+}
+.resize-edge-left:hover,
+.resize-edge-right:hover,
+.resize-edge-bottom:hover {
+  background: rgba(var(--accent-rgb), 0.35);
+}
+.sidebar-shell.collapsed .resize-edge-left,
+.sidebar-shell.collapsed .resize-edge-right,
+.sidebar-shell.collapsed .resize-edge-bottom,
+.sidebar-shell.collapsed .resize-corner-bl,
+.sidebar-shell.collapsed .resize-corner-br {
+  display: none !important;
 }
 
 /* ============================================================================
    BOTONES Y ELEMENTOS DINÁMICOS CON EL COLOR DEL USUARIO (--accent-color)
    ============================================================================ */
-
 .accent-bg {
   background-color: var(--accent-color) !important;
 }
@@ -126,7 +262,6 @@ html, body {
   border-color: var(--accent-color) !important;
 }
 
-/* Botón sólido principal del color elegido */
 .btn-accent {
   background-color: var(--accent-color);
   color: #020617;
@@ -140,7 +275,6 @@ html, body {
   box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.45);
 }
 
-/* Botón translúcido con tinte del color elegido */
 .btn-accent-soft {
   background-color: rgba(var(--accent-rgb), 0.16);
   border: 1px solid rgba(var(--accent-rgb), 0.42);
@@ -155,7 +289,6 @@ html, body {
   box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.3);
 }
 
-/* Pestaña de estado activa con el color del usuario */
 .status-tab-active {
   background-color: rgba(var(--accent-rgb), 0.25) !important;
   border: 1px solid rgba(var(--accent-rgb), 0.55) !important;
@@ -175,7 +308,6 @@ html, body {
   color: #ffffff;
 }
 
-/* Zona rápida de Pegar (Ctrl+V) o Arrastrar con el mouse */
 .paste-zone {
   background: rgba(var(--accent-rgb), 0.09);
   border: 1.5px dashed rgba(var(--accent-rgb), 0.45);
@@ -191,9 +323,10 @@ html, body {
 /* Botones de navegación del riel */
 .rail-btn {
   position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -208,17 +341,16 @@ html, body {
   background: rgba(var(--accent-rgb), 0.28);
   border-color: var(--accent-color);
   color: #ffffff;
-  transform: scale(1.06);
-  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.35);
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.35);
 }
 
-/* Badges numéricos en riel */
 .rail-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 17px;
-  height: 17px;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 4px;
   border-radius: 9999px;
   background: var(--accent-color);
@@ -244,7 +376,6 @@ html, body {
   border-color: var(--accent-color);
 }
 
-/* Barra de desplazamiento */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -260,7 +391,6 @@ html, body {
   background: var(--accent-color);
 }
 
-/* Animaciones */
 @keyframes popCard {
   0% { opacity: 0; transform: translateY(-8px) scale(0.98); }
   100% { opacity: 1; transform: translateY(0) scale(1); }

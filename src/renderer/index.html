@@ -30,35 +30,41 @@
 
   <link rel="stylesheet" href="./css/style.css">
 </head>
-<body class="text-slate-100 antialiased select-none w-screen h-screen m-0 p-0 overflow-hidden bg-transparent flex justify-end">
+<body class="text-slate-100 antialiased select-none w-screen h-screen m-0 p-0 overflow-hidden bg-transparent">
 
   <!-- ========================================================================= -->
-  <!-- CÁPSULA FLOTANTE: 68px EN MODO BARRA DELGADA / 410px EN MODO COMPLETO    -->
+  <!-- CÁPSULA FLOTANTE SIN VENTANA FANTASMA ATRÁS (VERTICAL Y HORIZONTAL)       -->
   <!-- ========================================================================= -->
-  <div id="sidebarShell" class="sidebar-shell expanded">
+  <div id="sidebarShell" class="sidebar-shell expanded vertical">
 
-    <!-- TIRADOR DE ARRASTRE EN EL BORDE IZQUIERDO -->
-    <div id="dragHandle" class="drag-handle no-drag" title="Arrastra el borde para abrir o cerrar"></div>
+    <!-- BORDES Y ESQUINAS PARA ACHICAR / REDIMENSIONAR CUANDO ESTÁ ABIERTA -->
+    <div id="resizeLeft" class="resize-edge-left no-drag" title="Arrastra para achicar o ensanchar"></div>
+    <div id="resizeRight" class="resize-edge-right no-drag" title="Arrastra para achicar o ensanchar"></div>
+    <div id="resizeBottom" class="resize-edge-bottom no-drag" title="Arrastra para achicar o alargar altura"></div>
+    <div id="resizeCornerBL" class="resize-corner-bl no-drag" title="Arrastra la esquina para cambiar tamaño"></div>
+    <div id="resizeCornerBR" class="resize-corner-br no-drag" title="Arrastra la esquina para achicar o agrandar">
+      <i class="fa-solid fa-up-right-and-down-left-from-center rotate-90"></i>
+    </div>
 
     <!-- ======================================================================= -->
-    <!-- MODO 1: BARRA DELGADA DE 68px (SOLO ICONOS CON EL COLOR DEL USUARIO)    -->
+    <!-- MODO 1: BARRA DELGADA (SE HACE VERTICAL IZQ/DER Y HORIZONTAL ARR/ABAJO) -->
     <!-- ======================================================================= -->
     <nav id="collapsedRail" class="rail-column no-drag">
-      <div class="flex flex-col items-center gap-2 w-full">
-        <!-- Agarradera para mover la barra cuando está encogida -->
+      <div class="rail-main-group">
+        <!-- Agarradera para mover la barra: si la llevas arriba/abajo se hace horizontal sola -->
         <div id="railMoveHandle"
-             class="w-11 h-8 rounded-xl btn-accent-soft flex items-center justify-center cursor-move"
-             title="Mantén presionado aquí y arrastra para mover la barra a cualquier lugar">
+             class="w-10 h-8 rounded-xl btn-accent-soft flex items-center justify-center cursor-move shrink-0"
+             title="Arrastra para mover (Arriba/Abajo = Horizontal, Izq/Der = Vertical)">
           <i class="fa-solid fa-up-down-left-right text-xs"></i>
         </div>
 
         <!-- Botón principal para expandir -->
-        <button type="button" onclick="window.AppSettingsUI.setExpanded(true)"
+        <button type="button" id="btnExpandRail" onclick="window.AppSettingsUI.setExpanded(true)"
                 class="rail-btn" title="Abrir barra completa">
-          <i class="fa-solid fa-angles-left text-sm"></i>
+          <i id="iconExpandRail" class="fa-solid fa-angles-left text-sm"></i>
         </button>
 
-        <div class="w-7 h-[1px] bg-white/10 my-0.5"></div>
+        <div class="rail-divider"></div>
 
         <!-- Pegar directo con 1 clic desde modo delgado -->
         <button type="button" onclick="captureClipboardManual()"
@@ -74,7 +80,7 @@
         </button>
 
         <!-- Áreas / Opciones dinámicas -->
-        <div id="railDynamicAreas" class="flex flex-col items-center gap-2.5 w-full"></div>
+        <div id="railDynamicAreas" class="rail-dynamic-group"></div>
 
         <!-- Urgentes -->
         <button type="button" onclick="window.AppTaskManager.filterFromRail('urgente')"
@@ -90,24 +96,37 @@
         </button>
       </div>
 
-      <!-- Ajustes abajo -->
-      <div class="flex flex-col items-center gap-2 w-full pt-2 border-t border-white/10">
-        <button type="button" onclick="window.AppSettingsUI.toggleSettingsDrawer()"
-                class="rail-btn" title="Personalizar colores y opciones">
-          <i class="fa-solid fa-palette"></i>
+      <!-- Controles inferiores/finales del riel: Girar orientación, Ajustes y Achicar barra -->
+      <div class="rail-bottom-group">
+        <!-- Girar entre Vertical y Horizontal con 1 clic -->
+        <button type="button" onclick="window.AppSettingsUI.toggleOrientation()"
+                class="rail-btn !w-9 !h-9" title="Cambiar entre barra Vertical y Horizontal">
+          <i id="iconOrientationRail" class="fa-solid fa-arrows-left-right text-xs"></i>
         </button>
+
+        <!-- Ajustes de colores -->
+        <button type="button" onclick="window.AppSettingsUI.toggleSettingsDrawer()"
+                class="rail-btn !w-9 !h-9" title="Personalizar colores y opciones">
+          <i class="fa-solid fa-palette text-xs"></i>
+        </button>
+
+        <!-- Tirador para ACHICAR o ALARGAR la barra cuando está encogida -->
+        <div id="railResizeHandle" class="rail-resize-grip"
+             title="Arrastra aquí para achicar o alargar la barra">
+          <i id="iconRailResize" class="fa-solid fa-grip-lines"></i>
+        </div>
       </div>
     </nav>
 
 
     <!-- ======================================================================= -->
-    <!-- MODO 2: SIDEBAR COMPLETO DE 410px (INTERFAZ LIMPIA DE 1 SOLA COLUMNA)  -->
+    <!-- MODO 2: SIDEBAR COMPLETO (SE PUEDE MOVER Y ACHICAR HASTA CIERTO PUNTO)  -->
     <!-- ======================================================================= -->
     <section class="expanded-content-pane">
 
-      <!-- 1. ENCABEZADO SUPERIOR -->
-      <header class="drag-region px-3.5 py-2.5 border-b border-white/10 flex items-center justify-between bg-slate-950/50">
-        <div class="flex items-center gap-2">
+      <!-- 1. ENCABEZADO SUPERIOR (ARRASTRABLE PARA MOVER LA VENTANA Y DEJARLA ESTÁTICA) -->
+      <header id="expandedHeaderDrag" class="px-3.5 py-2.5 border-b border-white/10 flex items-center justify-between bg-slate-950/50 cursor-move">
+        <div class="flex items-center gap-2 pointer-events-none">
           <div class="w-2.5 h-2.5 rounded-full accent-bg animate-pulse"></div>
           <div>
             <h1 class="font-bold text-xs tracking-wide text-white flex items-center gap-1.5">
@@ -117,11 +136,18 @@
         </div>
 
         <div class="no-drag flex items-center gap-1">
-          <!-- Hacer chica la barra (Colapsar a 68px) -->
-          <button type="button" onclick="window.AppSettingsUI.setExpanded(false)"
+          <!-- Hacer chica la barra (Colapsar) -->
+          <button type="button" id="btnCollapseHeader" onclick="window.AppSettingsUI.setExpanded(false)"
                   class="w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px]"
-                  title="Hacer barra delgada (Colapsar)">
-            <i class="fa-solid fa-angles-right"></i>
+                  title="Encoger barra (Si está arriba/abajo se hace Horizontal, si está a los lados se hace Vertical)">
+            <i id="iconCollapseHeader" class="fa-solid fa-angles-right"></i>
+          </button>
+
+          <!-- Alternar orientación Vertical / Horizontal al encoger -->
+          <button type="button" onclick="window.AppSettingsUI.toggleOrientation()"
+                  class="w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px]"
+                  title="Cambiar modo de barra encogida: Vertical ↔ Horizontal">
+            <i class="fa-solid fa-rotate text-[10px]"></i>
           </button>
 
           <!-- Nuevo Pendiente Manual (+) -->
@@ -148,7 +174,7 @@
           <!-- Candado Auto-colapsar -->
           <button type="button" id="btnAutoCollapseLock" onclick="window.AppSettingsUI.toggleAutoCollapseLock()"
                   class="w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px]"
-                  title="Fijar o auto-colapsar al sacar el mouse">
+                  title="Fijar estático o auto-colapsar al sacar el mouse">
             <i class="fa-solid fa-lock text-[10px]"></i>
           </button>
 
@@ -161,7 +187,7 @@
         </div>
       </header>
 
-      <!-- 2. ZONA PRINCIPAL DE PEGADO RÁPIDO (CTRL+V O ARRASTRAR CON MOUSE) -->
+      <!-- 2. ZONA PRINCIPAL DE PEGADO RÁPIDO (CTRL+V / CMD+V O ARRASTRAR CON MOUSE) -->
       <div class="no-drag px-3 pt-2.5 pb-2 bg-slate-950/30 border-b border-white/10 space-y-2">
 
         <!-- Caja de Pegado Automático (Ctrl+V o Drag & Drop) -->
@@ -252,7 +278,7 @@
           </div>
 
           <select id="areaFilterSelect"
-                  class="bg-black/35 border border-white/15 rounded-lg px-2 py-1.5 text-[11px] text-slate-100 font-medium accent-ring max-w-[135px]">
+                 class="bg-black/35 border border-white/15 rounded-lg px-2 py-1.5 text-[11px] text-slate-100 font-medium accent-ring max-w-[130px]">
             <!-- Dinámico -->
           </select>
 
@@ -263,7 +289,7 @@
           </button>
         </div>
 
-        <!-- Pestañas de Estado (actualizadas con el color del usuario) -->
+        <!-- Pestañas de Estado -->
         <div class="grid grid-cols-4 gap-1 pt-0.5 text-[11px]">
           <button type="button" onclick="setStatusFilter('all')" id="tab-all" class="status-tab status-tab-active py-1 rounded-lg transition">
             Todos (<span id="cnt-all">0</span>)
@@ -291,7 +317,7 @@
           </button>
         </div>
 
-        <!-- Presets de Color (Cambia todos los botones) -->
+        <!-- Presets de Color -->
         <div class="space-y-1.5">
           <div class="flex items-center justify-between">
             <span class="text-[11px] text-slate-200 font-semibold">Color de botones y barra:</span>
@@ -334,9 +360,9 @@
           <div>
             <div class="flex justify-between text-[11px] text-slate-300 mb-1">
               <span>Opacidad fondo</span>
-              <span id="lblOpacity" class="font-mono accent-text">84%</span>
+              <span id="lblOpacity" class="font-mono accent-text">88%</span>
             </div>
-            <input id="sliderOpacity" type="range" min="15" max="98" value="84"
+            <input id="sliderOpacity" type="range" min="15" max="98" value="88"
                    oninput="window.AppSettingsUI.setOpacity(this.value)"
                    class="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer">
           </div>
@@ -375,7 +401,7 @@
           <span>Exportar Excel</span>
         </button>
 
-        <div class="flex items-center gap-1 text-[10px] text-slate-400">
+        <div class="flex items-center gap-1 text-[10px] text-slate-400 pr-3">
           <span>Pega con</span>
           <kbd class="px-1.5 py-0.5 rounded bg-white/10 accent-text font-mono border border-white/10">Ctrl+V</kbd>
           <span>o arrastra</span>
