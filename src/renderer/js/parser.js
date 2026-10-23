@@ -186,7 +186,13 @@ async function parseMessageSmart(rawText, apiKey) {
   }
 }
 
+async function parseIncomingText(rawText) {
+  const apiKey = (window.AppState && window.AppState.settings) ? window.AppState.settings.geminiApiKey : '';
+  return await parseMessageSmart(rawText, apiKey);
+}
+
 window.AppParser = {
+  parseIncomingText,
   parseWhatsAppAndRawTextLocal,
   parseMessageSmart,
   isAfterSixPm

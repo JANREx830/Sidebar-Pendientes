@@ -324,39 +324,44 @@ function setupEventListeners() {
 
 // 5. CAPTURA AUTOMÁTICA Y GUARDADO INMEDIATO
 async function handleAutomaticCapture(rawText) {
-  if (!rawText || !rawText.trim()) {
-    window.AppTaskManager.triggerToast('El texto está vacío');
-    return;
+  try {
+    if (!rawText || !rawText.trim()) {
+      window.AppTaskManager.triggerToast('El texto está vacío');
+      return;
+    }
+
+    // Asegurar que la barra esté expandida y NO programar ningún auto-cierre
+    window.AppSettingsUI.setExpanded(true);
+
+    const parsed = await window.AppParser.parseIncomingText(rawText);
+
+    const selectedAreaFilter = window.AppState.filters.area;
+    const finalArea = (selectedAreaFilter && selectedAreaFilter !== 'all')
+      ? selectedAreaFilter
+      : (parsed.area || window.AppState.settings.areas[0] || 'General');
+
+    const newTask = {
+      id: 't-' + Date.now(),
+      createdAt: Date.now(),
+      sender: parsed.sender || 'WhatsApp',
+      text: parsed.text || rawText.trim(),
+      notes: '',
+      area: finalArea,
+      urgency: parsed.urgency || 'Media',
+      status: 'pendiente',
+      dateTimeFormatted: parsed.dateTimeFormatted || `[${new Date().toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' })}, ${new Date().toLocaleDateString('es-MX')}]`,
+      timestamp: parsed.timestamp || '',
+      date: parsed.date || ''
+    };
+
+    window.AppState.tasks.unshift(newTask);
+    await window.AppTaskManager.persistTasks();
+    window.AppTaskManager.renderTaskList();
+    window.AppTaskManager.triggerToast(`Guardado: ${newTask.sender} (${newTask.area})`);
+  } catch (err) {
+    console.error('[Capture Error]', err);
+    window.AppTaskManager.triggerToast('Error procesando texto: ' + (err.message || 'desconocido'));
   }
-
-  // Asegurar que la barra esté expandida y NO programar ningún auto-cierre
-  window.AppSettingsUI.setExpanded(true);
-
-  const parsed = await window.AppParser.parseIncomingText(rawText);
-
-  const selectedAreaFilter = window.AppState.filters.area;
-  const finalArea = (selectedAreaFilter && selectedAreaFilter !== 'all')
-    ? selectedAreaFilter
-    : parsed.area;
-
-  const newTask = {
-    id: 't-' + Date.now(),
-    createdAt: Date.now(),
-    sender: parsed.sender,
-    text: parsed.text,
-    notes: '',
-    area: finalArea,
-    urgency: parsed.urgency,
-    status: 'pendiente',
-    dateTimeFormatted: parsed.dateTimeFormatted,
-    timestamp: parsed.timestamp,
-    date: parsed.date
-  };
-
-  window.AppState.tasks.unshift(newTask);
-  await window.AppTaskManager.persistTasks();
-  window.AppTaskManager.renderTaskList();
-  window.AppTaskManager.triggerToast(`Guardado: ${newTask.sender} (${newTask.area})`);
 }
 
 async function captureClipboardManual() {

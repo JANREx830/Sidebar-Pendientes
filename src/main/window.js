@@ -427,6 +427,10 @@ function createMainWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
+  mainWindow.webContents.on('console-message', (_event, _level, message, line, sourceId) => {
+    console.log(`[Renderer] ${message} (${path.basename(sourceId || '')}:${line})`);
+  });
+
   // Soporte nativo en macOS para flotar sobre todos los escritorios sin ventana fantasma detrás
   if (process.platform === 'darwin') {
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
