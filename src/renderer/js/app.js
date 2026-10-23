@@ -183,7 +183,27 @@ function setupPasteAndDragDrop() {
   const pasteZone = document.getElementById('pasteDropZone');
   const quickPasteInput = document.getElementById('quickPasteInput');
 
-  // Pegado directo con teclado (Ctrl+V / Cmd+V) en cualquier lugar de la ventana
+  // Soporte directo para atajo de teclado Cmd+V (Mac) y Ctrl+V (Windows)
+  window.addEventListener('keydown', async (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key && e.key.toLowerCase() === 'v') {
+      const activeEl = document.activeElement;
+      const isOtherInput = activeEl && (
+        activeEl.id === 'searchInput' ||
+        activeEl.id === 'manualSender' ||
+        activeEl.id === 'manualText' ||
+        activeEl.id === 'newAreaInput' ||
+        activeEl.id === 'quickNewAreaInput' ||
+        (activeEl.id && activeEl.id.startsWith('edit-'))
+      );
+
+      if (!isOtherInput) {
+        e.preventDefault();
+        await captureClipboardManual();
+      }
+    }
+  }, true);
+
+  // Pegado directo con evento paste (Chromium / WebKit)
   window.addEventListener('paste', async (e) => {
     const activeEl = document.activeElement;
     const isOtherInput = activeEl && (
@@ -197,7 +217,11 @@ function setupPasteAndDragDrop() {
 
     if (isOtherInput) return;
 
-    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+    let pastedText = (e.clipboardData || window.clipboardData)?.getData('text');
+    if (!pastedText && window.electronAPI && window.electronAPI.readClipboardNow) {
+      pastedText = await window.electronAPI.readClipboardNow();
+    }
+
     if (pastedText && pastedText.trim()) {
       e.preventDefault();
       if (quickPasteInput) quickPasteInput.value = '';
@@ -216,7 +240,10 @@ function setupPasteAndDragDrop() {
     });
 
     quickPasteInput.addEventListener('paste', async (e) => {
-      const text = (e.clipboardData || window.clipboardData).getData('text');
+      let text = (e.clipboardData || window.clipboardData)?.getData('text');
+      if (!text && window.electronAPI && window.electronAPI.readClipboardNow) {
+        text = await window.electronAPI.readClipboardNow();
+      }
       if (text && text.trim()) {
         e.preventDefault();
         quickPasteInput.value = '';
@@ -225,11 +252,14 @@ function setupPasteAndDragDrop() {
     });
   }
 
-  // Soporte TOTAL de arrastrar texto con el mouse desde WhatsApp o cualquier ventana (Drag & Drop)
+  // Soporte universal Drag & Drop (Windows y macOS con Safari, WhatsApp Desktop y Web)
   const handleDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+      e.dataTransfer.effectAllowed = 'all';
+    }
     if (pasteZone) pasteZone.classList.add('drag-over');
   };
 
@@ -246,12 +276,30 @@ function setupPasteAndDragDrop() {
 
     let text = '';
     if (e.dataTransfer) {
+      // 1. getData estándar
       text = e.dataTransfer.getData('text/plain') ||
              e.dataTransfer.getData('text') ||
-             e.dataTransfer.getData('Text');
+             e.dataTransfer.getData('Text') ||
+             e.dataTransfer.getData('public.utf8-plain-text');
 
+      // 2. dataTransfer.items asíncrono (específico de Safari / WhatsApp Mac)
+      if (!text && e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+        for (const item of Array.from(e.dataTransfer.items)) {
+          if (item.kind === 'string') {
+            try {
+              const itemStr = await new Promise(resolve => item.getAsString(resolve));
+              if (itemStr && itemStr.trim()) {
+                text = itemStr;
+                break;
+              }
+            } catch (err) {}
+          }
+        }
+      }
+
+      // 3. Fallback a HTML si es texto enriquecido de WhatsApp Mac
       if (!text) {
-        const html = e.dataTransfer.getData('text/html');
+        const html = e.dataTransfer.getData('text/html') || e.dataTransfer.getData('public.html');
         if (html) {
           const div = document.createElement('div');
           div.innerHTML = html;
@@ -373,12 +421,14 @@ async function captureClipboardManual() {
       text = await navigator.clipboard.readText();
     }
     if (!text || !text.trim()) {
-      window.AppTaskManager.triggerToast('Copia un texto primero (Ctrl+C)');
+      const isMac = (window.electronAPI && window.electronAPI.platform === 'darwin');
+      window.AppTaskManager.triggerToast(isMac ? 'Copia un texto primero (Cmd ⌘ + C)' : 'Copia un texto primero (Ctrl+C)');
       return;
     }
     await handleAutomaticCapture(text);
   } catch (err) {
-    window.AppTaskManager.triggerToast('Presiona Ctrl+V directamente en la barra');
+    const isMac = (window.electronAPI && window.electronAPI.platform === 'darwin');
+    window.AppTaskManager.triggerToast(isMac ? 'Presiona Cmd ⌘ + V en la barra' : 'Presiona Ctrl+V en la barra');
   }
 }
 

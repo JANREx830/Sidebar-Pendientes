@@ -19,7 +19,16 @@ function setupIpcHandlers() {
   ipcMain.handle('get-settings', () => storage.getSettings());
   ipcMain.handle('save-settings', (_event, settings) => storage.saveSettings(settings));
 
-  ipcMain.handle('read-clipboard-now', () => clipboard.readText());
+  ipcMain.handle('read-clipboard-now', () => {
+    let text = clipboard.readText();
+    if (!text) {
+      const html = clipboard.readHTML();
+      if (html) {
+        text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      }
+    }
+    return text || '';
+  });
 
   ipcMain.handle('toggle-always-on-top', () => {
     const win = getMainWindow();

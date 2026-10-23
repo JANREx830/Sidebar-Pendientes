@@ -417,6 +417,7 @@ function createMainWindow() {
     resizable: true,
     skipTaskbar: false,
     hasShadow: false,
+    acceptFirstMouse: true, // Crucial para macOS: permite soltar arrastre (Drag & Drop) y hacer clic sin necesitar un clic previo de enfoque
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,

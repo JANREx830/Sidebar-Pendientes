@@ -7,7 +7,13 @@ function captureAndSendToRenderer() {
   const win = getMainWindow();
   if (!win || win.isDestroyed()) return;
 
-  const rawText = clipboard.readText() || '';
+  let rawText = clipboard.readText();
+  if (!rawText) {
+    const html = clipboard.readHTML();
+    if (html) {
+      rawText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+  }
 
   setSidebarExpandedState(true);
   setWindowIgnoreMouseSafe(false);
@@ -15,7 +21,7 @@ function captureAndSendToRenderer() {
   if (!win.isVisible()) win.show();
   if (win.isMinimized()) win.restore();
 
-  win.webContents.send('clipboard-capture', rawText);
+  win.webContents.send('clipboard-capture', rawText || '');
 }
 
 function registerShortcuts() {
