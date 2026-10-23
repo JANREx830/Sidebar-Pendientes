@@ -71,6 +71,9 @@ async function loadInitialStorage() {
     console.warn('[App] Usando ajustes predeterminados:', err);
   }
 
+  // La barra debe permanecer siempre abierta y NUNCA cerrarse sola al sacar el mouse
+  window.AppState.settings.autoCollapseOnLeave = false;
+
   try {
     if (window.electronAPI && window.electronAPI.getTasks) {
       const savedTasks = await window.electronAPI.getTasks();
@@ -179,8 +182,8 @@ function setupWindowDragAndResize() {
 function setupPasteAndDragDrop() {
   const pasteZone = document.getElementById('pasteDropZone');
   const quickPasteInput = document.getElementById('quickPasteInput');
-  const shell = document.getElementById('sidebarShell');
 
+  // Pegado directo con teclado (Ctrl+V / Cmd+V) en cualquier lugar de la ventana
   window.addEventListener('paste', async (e) => {
     const activeEl = document.activeElement;
     const isOtherInput = activeEl && (
@@ -211,29 +214,65 @@ function setupPasteAndDragDrop() {
         await handleAutomaticCapture(text);
       }
     });
-  }
 
-  if (shell) {
-    shell.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
-      if (pasteZone) pasteZone.classList.add('drag-over');
-    });
-
-    shell.addEventListener('dragleave', () => {
-      if (pasteZone) pasteZone.classList.remove('drag-over');
-    });
-
-    shell.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      if (pasteZone) pasteZone.classList.remove('drag-over');
-
-      const droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text');
-      if (droppedText && droppedText.trim()) {
-        await handleAutomaticCapture(droppedText);
+    quickPasteInput.addEventListener('paste', async (e) => {
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      if (text && text.trim()) {
+        e.preventDefault();
+        quickPasteInput.value = '';
+        await handleAutomaticCapture(text);
       }
     });
   }
+
+  // Soporte TOTAL de arrastrar texto con el mouse desde WhatsApp o cualquier ventana (Drag & Drop)
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    if (pasteZone) pasteZone.classList.add('drag-over');
+  };
+
+  const handleDragLeave = (e) => {
+    if (!e.relatedTarget || e.relatedTarget === document.documentElement) {
+      if (pasteZone) pasteZone.classList.remove('drag-over');
+    }
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (pasteZone) pasteZone.classList.remove('drag-over');
+
+    let text = '';
+    if (e.dataTransfer) {
+      text = e.dataTransfer.getData('text/plain') ||
+             e.dataTransfer.getData('text') ||
+             e.dataTransfer.getData('Text');
+
+      if (!text) {
+        const html = e.dataTransfer.getData('text/html');
+        if (html) {
+          const div = document.createElement('div');
+          div.innerHTML = html;
+          text = div.innerText || div.textContent || '';
+        }
+      }
+    }
+
+    if (text && text.trim()) {
+      if (quickPasteInput) quickPasteInput.value = '';
+      await handleAutomaticCapture(text.trim());
+    }
+  };
+
+  window.addEventListener('dragenter', handleDragOver, true);
+  window.addEventListener('dragover', handleDragOver, true);
+  window.addEventListener('dragleave', handleDragLeave, true);
+  window.addEventListener('drop', handleDrop, true);
+
+  document.addEventListener('dragover', (e) => e.preventDefault(), false);
+  document.addEventListener('drop', (e) => e.preventDefault(), false);
 }
 
 // 4. EVENTOS GENERALES DE INTERFAZ
@@ -242,7 +281,6 @@ function setupEventListeners() {
   const btnClearSearch = document.getElementById('btnClearSearch');
   const areaSelect = document.getElementById('areaFilterSelect');
   const btnCaptureNow = document.getElementById('btnCaptureNow');
-  const shell = document.getElementById('sidebarShell');
 
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
@@ -274,23 +312,8 @@ function setupEventListeners() {
     btnCaptureNow.addEventListener('click', captureClipboardManual);
   }
 
-  if (shell) {
-    shell.addEventListener('mouseenter', () => {
-      if (leaveCollapseTimer) {
-        clearTimeout(leaveCollapseTimer);
-        leaveCollapseTimer = null;
-      }
-    });
-
-    shell.addEventListener('mouseleave', () => {
-      if (isDraggingOrResizing) return;
-      if (window.AppState.settings.autoCollapseOnLeave && window.AppState.isExpanded) {
-        leaveCollapseTimer = setTimeout(() => {
-          window.AppSettingsUI.setExpanded(false);
-        }, 450);
-      }
-    });
-  }
+  // Se eliminó por completo el auto-cierre al sacar el mouse para que la barra NUNCA se cierre sola
+  // mientras el usuario copia o selecciona en WhatsApp.
 
   if (window.electronAPI && window.electronAPI.onClipboardCapture) {
     window.electronAPI.onClipboardCapture(async (rawText) => {
@@ -302,19 +325,12 @@ function setupEventListeners() {
 // 5. CAPTURA AUTOMÁTICA Y GUARDADO INMEDIATO
 async function handleAutomaticCapture(rawText) {
   if (!rawText || !rawText.trim()) {
-    window.AppTaskManager.triggerToast('El portapapeles está vacío');
+    window.AppTaskManager.triggerToast('El texto está vacío');
     return;
   }
 
-  const wasCollapsed = !window.AppState.isExpanded;
+  // Asegurar que la barra esté expandida y NO programar ningún auto-cierre
   window.AppSettingsUI.setExpanded(true);
-
-  if (wasCollapsed && window.AppState.settings.autoCollapseOnLeave) {
-    if (autoCaptureExpandTimer) clearTimeout(autoCaptureExpandTimer);
-    autoCaptureExpandTimer = setTimeout(() => {
-      window.AppSettingsUI.setExpanded(false);
-    }, 5000);
-  }
 
   const parsed = await window.AppParser.parseIncomingText(rawText);
 

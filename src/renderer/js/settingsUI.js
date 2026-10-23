@@ -316,33 +316,20 @@ function toggleExpand() {
   setExpanded(!window.AppState.isExpanded);
 }
 
-// 4. CANDADO / PIN DE AUTO-COLAPSO AL SACAR EL MOUSE
+// 4. CANDADO / BARRA FIJADA PERMANENTE
 function toggleAutoCollapseLock() {
-  const current = window.AppState.settings.autoCollapseOnLeave;
-  window.AppState.settings.autoCollapseOnLeave = !current;
+  window.AppState.settings.autoCollapseOnLeave = false;
   updatePinButtonUI();
   persistSettings();
-  window.AppTaskManager.triggerToast(
-    window.AppState.settings.autoCollapseOnLeave
-      ? 'Auto-colapso al sacar el mouse: Activado'
-      : 'Estático: No se cierra solo al sacar el mouse'
-  );
+  window.AppTaskManager.triggerToast('Barra fijada: Se mantiene abierta siempre');
 }
 
 function updatePinButtonUI() {
   const btn = document.getElementById('btnAutoCollapseLock');
   if (!btn) return;
-  const isAuto = window.AppState.settings.autoCollapseOnLeave;
-
-  if (isAuto) {
-    btn.className = 'w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 text-slate-400 flex items-center justify-center text-[11px] transition';
-    btn.innerHTML = '<i class="fa-solid fa-lock-open text-[10px]"></i>';
-    btn.title = 'Auto-colapsa al sacar el mouse (Clic para dejar fijo)';
-  } else {
-    btn.className = 'w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px] transition';
-    btn.innerHTML = '<i class="fa-solid fa-lock text-[10px]"></i>';
-    btn.title = 'Fijado estático (Clic para activar auto-colapso)';
-  }
+  btn.className = 'w-7 h-7 rounded-lg btn-accent-soft flex items-center justify-center text-[11px] transition';
+  btn.innerHTML = '<i class="fa-solid fa-lock text-[10px]"></i>';
+  btn.title = 'Barra fijada (No se cierra sola)';
 }
 
 function toggleSettingsDrawer() {
